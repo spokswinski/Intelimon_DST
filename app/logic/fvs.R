@@ -1,0 +1,196 @@
+# app/logic/fvs.R
+# ---------------------------------------------------------------------------
+# Forest Vegetation Simulator (FVS) export.
+#
+# Builds the two input pieces FVS needs: a treelist (FVS_TreeInit) plus a
+# stand record (FVS_StandInit), and a keyword (.key) file. Values are emitted
+# in FVS's US customary units (inches / feet / acres) from the metric lidar
+# inputs.
+#
+# What lidar supplies directly:
+#   DBH        <- inventory DBH (already INCHES; no conversion)
+#   Ht         <- inventory H (m -> ft)
+#   CrRatio    <- (H - CBH) / H, i.e. MEASURED crown ratio rather than an
+#                 imputed one - the main advantage of a lidar-derived treelist
+#   TreeCount  <- expansion factor 1 / nonocarea(acres), occlusion-corrected
+#   DG / HtG   <- diameter/height increments between matched scans
+#
+# What lidar does NOT supply and the user must set:
+#   Species    <- not measurable from TLS; supplied as a composition ratio and
+#                 allocated per stem by an assignment rule (see forestry.R)
+#   Site index, slope, aspect, variant
+#
+# IMPORTANT: keyword spellings and field widths vary between FVS versions and
+# variants. Verify the generated files against the FVS documentation for your
+# variant before relying on a run. Nothing here is validated against a live
+# FVS install.
+# ---------------------------------------------------------------------------
+
+box::use(
+  data.table[data.table, as.data.table, fwrite],
+)
+
+M_TO_FT <- 3.280840
+
+#' Build the FVS_TreeInit table for one scan's stems.
+#'
+#' @param trees data.table with DBH (inches), H (m); optional cr, species, TreeID
+#' @param stand_id character stand identifier
+#' @param ef_tpa expansion factor (trees/acre represented by each stem)
+#' @param use_crown_ratio use lidar crown ratio when available
+#' @param increments optional data.table with TreeID, dg_in, htg_ft
+#' @return data.table shaped for FVS_TreeInit
+#' @export
+build_treeinit <- function(trees, stand_id, ef_tpa,
+                           use_crown_ratio = TRUE, increments = NULL) {
+  n <- nrow(trees)
+  if (n == 0) return(data.table())
+
+  tree_id <- if (!is.null(trees$TreeID)) as.integer(trees$TreeID) else seq_len(n)
+  dbh_in  <- round(suppressWarnings(as.numeric(trees$DBH)), 1)  # already inches
+  ht_ft   <- round(suppressWarnings(as.numeric(trees$H)) * M_TO_FT, 0)
+
+  cr_pct <- rep(NA_real_, n)
+  if (use_crown_ratio && !is.null(trees$cr)) {
+    cr_pct <- round(suppressWarnings(as.numeric(trees$cr)) * 100, 0)
+    cr_pct[!is.finite(cr_pct) | cr_pct <= 0 | cr_pct > 100] <- NA_real_
+  }
+
+  species <- if (!is.null(trees$species)) as.character(trees$species) else NA_character_
+
+  out <- data.table(
+    Stand_ID  = stand_id,
+    StandPlot_ID = stand_id,
+    Tree_ID   = tree_id,
+    TreeCount = round(ef_tpa, 4),
+    History   = 1L,          # 1 = live tree
+    Species   = species,
+    DBH       = dbh_in,
+    DG        = NA_real_,
+    Ht        = ht_ft,
+    HtG       = NA_real_,
+    CrRatio   = cr_pct
+  )
+
+  if (!is.null(increments) && nrow(increments) > 0 &&
+      "TreeID" %in% names(increments)) {
+    inc <- as.data.table(increments)
+    m <- match(out$Tree_ID, inc$TreeID)
+    if ("dg_in" %in% names(inc))  out[, DG  := round(inc$dg_in[m], 2)]
+    if ("htg_ft" %in% names(inc)) out[, HtG := round(inc$htg_ft[m], 1)]
+  }
+
+  out[]
+}
+
+#' Build the FVS_StandInit record for one stand.
+#' @export
+build_standinit <- function(stand_id, inv_year, area_ac, variant,
+                            site_species, site_index,
+                            slope_pct = 0, aspect_deg = 0, elev_ft = NA_real_,
+                            lat = NA_real_, lon = NA_real_,
+                            notes = "IntELiMon lidar plot") {
+  data.table(
+    Stand_ID     = stand_id,
+    Variant      = variant,
+    Inv_Year     = as.integer(inv_year),
+    Groups       = "IntELiMon",
+    Sam_Wt       = 1,
+    Basal_Area_Factor = 0,        # 0 => fixed-area plot
+    Inv_Plot_Size = round(area_ac, 4),
+    Site_Species = site_species,
+    Site_Index   = as.numeric(site_index),
+    Slope        = as.numeric(slope_pct),
+    Aspect       = as.numeric(aspect_deg),
+    Elevation    = elev_ft,
+    Latitude     = lat,
+    Longitude    = lon,
+    Notes        = notes
+  )
+}
+
+#' Compose an FVS keyword (.key) file as a character vector of lines.
+#'
+#' @param thinning optional list(keyword=, year=, value=, comment=)
+#' @param ffe include the Fire and Fuels Extension block
+#' @export
+build_keyfile <- function(stand_id, inv_year, area_ac, variant,
+                          site_species, site_index,
+                          num_cycles = 5, time_int = 10,
+                          slope_pct = 0, aspect_deg = 0,
+                          thinning = NULL, ffe = TRUE,
+                          use_crown_ratio = TRUE, use_increments = FALSE,
+                          tree_data_file = "FVS_Data.db") {
+  L <- character()
+  add <- function(...) L <<- c(L, paste0(...))
+
+  add("!! Generated by the IntELiMon Decision Support Tool")
+  add("!! Variant: ", variant,
+      "  |  verify keywords against FVS documentation before use")
+  add("StdIdent")
+  add(stand_id, "   IntELiMon lidar plot")
+  add("InvYear        ", format(as.integer(inv_year)))
+  add("Design         ", format(round(area_ac, 4)),
+      "        !! fixed-area plot size (acres), occlusion-corrected")
+  add("SiteCode       ", site_species, "  ", format(site_index))
+  add("Slope          ", format(slope_pct))
+  add("Aspect         ", format(aspect_deg))
+  add("NumCycle       ", format(num_cycles))
+  add("TimeInt        0  ", format(time_int))
+
+  if (use_crown_ratio) {
+    add("!! Per-tree crown ratios supplied from lidar (H - CBH) / H")
+  }
+  if (use_increments) {
+    add("!! Measured DG / HtG supplied from matched repeat scans")
+  }
+
+  if (!is.null(thinning)) {
+    add("!! ", thinning$comment %||% "prescription from Forestry tool")
+    add(thinning$keyword, "       ", format(thinning$year), "  ",
+        format(thinning$value))
+  }
+
+  if (ffe) {
+    add("FMIn")
+    add("  PotFire")
+    add("  FuelOut")
+    add("  CarbRept")
+    add("End")
+  }
+
+  add("Database")
+  add("  DSNIn")
+  add("  ", tree_data_file)
+  add("  StandSQL")
+  add("    SELECT * FROM FVS_StandInit WHERE Stand_ID = '%Stand_ID%'")
+  add("  EndSQL")
+  add("  TreeSQL")
+  add("    SELECT * FROM FVS_TreeInit WHERE Stand_ID = '%Stand_ID%'")
+  add("  EndSQL")
+  add("End")
+  add("Process")
+  add("Stop")
+  L
+}
+
+`%||%` <- function(a, b) if (is.null(a)) b else a
+
+#' Map a prescription method to an FVS thinning keyword.
+#' Names vary by FVS version - verify before use.
+#' @export
+thin_keyword <- function(method, target_ba_ac = NULL, species = NULL,
+                         year = NULL) {
+  switch(
+    method,
+    below   = list(keyword = "ThinBBA", year = year, value = target_ba_ac,
+                   comment = "thin from below to residual basal area"),
+    above   = list(keyword = "ThinABA", year = year, value = target_ba_ac,
+                   comment = "thin from above to residual basal area"),
+    species = list(keyword = "ThinDBH", year = year, value = species,
+                   comment = "remove species component"),
+    spacing = list(keyword = "ThinSDI", year = year, value = target_ba_ac,
+                   comment = "spacing / crop-tree release"),
+    NULL
+  )
+}

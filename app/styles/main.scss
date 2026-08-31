@@ -1,0 +1,11 @@
+// app/styles/main.scss
+// ---------------------------------------------------------------------------
+// Intentionally empty. Application styles live in app/static/styles.css and
+// are attached from app/main.R through the page_navbar `header` slot.
+//
+// Reason: bslib's page_navbar() renders a complete HTML page, and Rhino's
+// auto-included compiled stylesheet does not reliably merge into a full bslib
+// page — so styles placed here would silently fail to load. Edit
+// app/static/styles.css instead. If a future refactor switches the app away
+// from a bslib full-page layout, SCSS can move back here.
+// ---------------------------------------------------------------------------
