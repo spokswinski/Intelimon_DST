@@ -150,10 +150,14 @@ server <- function(id, state) {
           group = "Satellite",
           options = providerTileOptions(maxZoom = 20)
         ) |>
-        addProviderTiles(
-          providers$CartoDB.Positron,
+        addTiles(
+          urlTemplate = "https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png?key=cb1_2nr5_1_392ce3984694e7a58625372e",
           group = "Political map",
-          options = providerTileOptions(maxZoom = 20)
+          options = tileOptions(maxZoom = 20),
+          attribution = paste(
+            '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+            '&copy; <a href="https://carto.com/attributions">CARTO</a>'
+          )
         ) |>
         addLayersControl(
           baseGroups = c("Satellite", "Political map"),

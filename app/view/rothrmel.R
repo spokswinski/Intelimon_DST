@@ -15,7 +15,7 @@ box::use(
   data.table[...],
 )
 box::use(
-  app/logic/plotting[metric_series_plot],
+  app/logic/plotting[metric_series_plot, plot_card_ui, register_plot_download],
   app/logic/fire_behavior[scan_fire_behavior, FIRE_METRIC_LABELS],
   app/logic/constants[
     PANO_CROP_TOP, PANO_CROP_BOTTOM, PANO_CROP_LEFT, PANO_CROP_RIGHT
@@ -137,11 +137,11 @@ ui <- function(id) {
           col_sizes = c("1fr", "1fr"),
           gap_size = "10px",
           grid_card(area = "card1",
-                    card_body(plotOutput(ns("card1"), height = "100%"))),
+                    card_body(plot_card_ui(ns, "card1"))),
           grid_card(area = "card2",
-                    card_body(plotOutput(ns("card2"), height = "100%"))),
+                    card_body(plot_card_ui(ns, "card2"))),
           grid_card(area = "card3",
-                    card_body(plotOutput(ns("card3"), height = "100%"))),
+                    card_body(plot_card_ui(ns, "card3"))),
           grid_card(
             area = "panoViewer",
             full_screen = TRUE,
@@ -225,19 +225,23 @@ server <- function(id, state) {
                     "Surface fuels held constant across scans; canopy still per-scan."))
     })
 
-    # One card renderer bound to a metric-dropdown input id
-    fire_card <- function(input_id) {
-      renderPlot({
+    # One card renderer bound to a metric-dropdown input id. `light` switches
+    # the palette for the SVG/PNG downloads (white page instead of glass card).
+    fire_card <- function(id, input_id) {
+      plot_fn <- function(light = FALSE) {
         key <- input[[input_id]]
         metric_series_plot(key, FIRE_METRIC_LABELS[[key]], fire_behavior(),
                            state$treatment_dates(),
-                           input$show_errorbars, input$show_treatments, input$plot_mode)
-      }, bg = "transparent", res = 110)
+                           input$show_errorbars, input$show_treatments,
+                           input$plot_mode, light = light)
+      }
+      output[[id]] <- renderPlot(plot_fn(), bg = "transparent", res = 110)
+      register_plot_download(output, id, plot_fn, id)
     }
 
-    output$card1 <- fire_card("metric_1")
-    output$card2 <- fire_card("metric_2")
-    output$card3 <- fire_card("metric_3")
+    fire_card("card1", "metric_1")
+    fire_card("card2", "metric_2")
+    fire_card("card3", "metric_3")
 
     # -- Points2Pano viewer (same behavior as the Direct outputs tab) --------
     pano_idx <- reactiveVal(1)
