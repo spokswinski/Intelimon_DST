@@ -637,6 +637,22 @@ main > .container-fluid,
 .imn-fval{ font-family:'JetBrains Mono',monospace; font-size:12px;
   color:var(--imn-accent2); text-align:right; }
 
+/* ---------- Navbar selection readout ("n scans from n plots selected") ----
+   Sits at the right-hand end of the navbar, past the Help tab. Styled as a
+   readout chip rather than a nav link so it does not look clickable. ------- */
+.imn-scancount{
+  display:flex; align-items:center; white-space:nowrap;
+  height:100%; margin-left:.4rem; padding:.26rem .7rem;
+  background:var(--imn-panel-2); border:1px solid var(--imn-border);
+  border-radius:10px; color:var(--imn-text);
+  font-size:12px; font-weight:600; letter-spacing:.01em;
+}
+.navbar .nav-item:has(.imn-scancount){ display:flex; align-items:center; }
+
+@media (max-width: 900px){
+  .imn-scancount{ font-size:11px; padding:.2rem .5rem; }
+}
+
 /* ---------- Plot card download menu (Direct outputs / Predictive models /
    rothRmel): a "Download" dropdown pinned to the card's lower-right corner
    offering CSV data, SVG image or PNG image of that card's plot. ---------- */
