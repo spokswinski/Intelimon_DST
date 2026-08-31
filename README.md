@@ -1,13 +1,13 @@
-# IntELiMon Dashboard (Rhino)
+# IntELiMon Decision Support Tool
 
-Rhino conversion of the single-file `Dashboardtest.R` Shiny app for the USGS
+Rhino conversion of the Shiny app for the USGS
 IntELiMon lidar vegetation/fuels monitoring program. Each tab is an
 independent [`box`](https://klmr.me/box/) module under `app/view/`, shared
 logic lives under `app/logic/`, and cross-tab state flows through one reactive
 store instead of global `<<-` assignment.
 
 
-## Look & feel
+## Theme
 
 The app ships with the **Aurora Glass** theme: a blurred aurora background with frosted translucent cards. Styling lives in `app/static/styles.css` (attached via the navbar header slot); plots render with a transparent background and light text (`aurora_theme()` in `app/logic/plotting.R`) so they sit on the glass. The navbar shows the IntELiMon logo and title, and the page footer carries the federal sponsor plate (USGS, FWS, USDA Forest Service, BIA, NPS, SERDP/ESTCP) — all embedded as base64 in `app/logic/brand.R`.
 
