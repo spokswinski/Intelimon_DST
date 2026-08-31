@@ -13,7 +13,7 @@ box::use(
   data.table[...],
 )
 box::use(
-  app/logic/plotting[metric_series_plot],
+  app/logic/plotting[metric_series_plot, plot_card_ui, register_plot_download],
   app/logic/constants[
     PANO_CROP_TOP, PANO_CROP_BOTTOM, PANO_CROP_LEFT, PANO_CROP_RIGHT
   ],
@@ -64,11 +64,11 @@ ui <- function(id) {
           col_sizes = c("1fr", "1fr"),
           gap_size = "10px",
           grid_card(area = "modelA",
-                    card_body(plotOutput(ns("modelA"), height = "100%"))),
+                    card_body(plot_card_ui(ns, "modelA"))),
           grid_card(area = "modelB",
-                    card_body(plotOutput(ns("modelB"), height = "100%"))),
+                    card_body(plot_card_ui(ns, "modelB"))),
           grid_card(area = "modelC",
-                    card_body(plotOutput(ns("modelC"), height = "100%"))),
+                    card_body(plot_card_ui(ns, "modelC"))),
           grid_card(
             area = "panoViewer",
             full_screen = TRUE,
@@ -115,9 +115,10 @@ server <- function(id, state) {
       updateSelectInput(session, "model_c", choices = model_choices, selected = pick(3))
     })
 
-    # One card renderer bound to a dropdown input id
-    model_card <- function(input_id) {
-      renderPlot({
+    # One card renderer bound to a dropdown input id. `light` switches the
+    # palette for the SVG/PNG downloads (white page instead of glass card).
+    model_card <- function(id, input_id) {
+      plot_fn <- function(light = FALSE) {
         key <- input[[input_id]]
         shiny::validate(shiny::need(
           nzchar(key),
@@ -126,13 +127,15 @@ server <- function(id, state) {
         metric_series_plot(key, key, state$additional_models_wide(),
                            state$treatment_dates(),
                            input$show_errorbars_pm, input$show_treatments_pm,
-                           input$plot_mode_pm)
-      }, bg = "transparent", res = 110)
+                           input$plot_mode_pm, light = light)
+      }
+      output[[id]] <- renderPlot(plot_fn(), bg = "transparent", res = 110)
+      register_plot_download(output, id, plot_fn, id)
     }
 
-    output$modelA <- model_card("model_a")
-    output$modelB <- model_card("model_b")
-    output$modelC <- model_card("model_c")
+    model_card("modelA", "model_a")
+    model_card("modelB", "model_b")
+    model_card("modelC", "model_c")
 
     # -- Points2Pano viewer (same behaviour as the Direct outputs tab) -------
     pano_idx <- reactiveVal(1)

@@ -13,7 +13,7 @@ box::use(
   data.table[...],
 )
 box::use(
-  app/logic/plotting[metric_series_plot],
+  app/logic/plotting[metric_series_plot, plot_card_ui, register_plot_download],
   app/logic/series[parse_treatment_dates],
   app/logic/constants[
     TREE_METRIC_LABELS, VOLUME_METRIC_LABELS, CANOPY_METRIC_LABELS,
@@ -93,11 +93,11 @@ ui <- function(id) {
           col_sizes = c("1fr", "1fr"),
           gap_size = "10px",
           grid_card(area = "treeStats",
-                    card_body(plotOutput(ns("treeStats"), height = "100%"))),
+                    card_body(plot_card_ui(ns, "treeStats"))),
           grid_card(area = "canopyStats",
-                    card_body(plotOutput(ns("canopyStats"), height = "100%"))),
+                    card_body(plot_card_ui(ns, "canopyStats"))),
           grid_card(area = "volumeStats",
-                    card_body(plotOutput(ns("volumeStats"), height = "100%"))),
+                    card_body(plot_card_ui(ns, "volumeStats"))),
           grid_card(
             area = "panoViewer",
             full_screen = TRUE,
@@ -151,26 +151,23 @@ server <- function(id, state) {
     })
 
     # -- Metric time-series cards -------------------------------------------
-    output$treeStats <- renderPlot({
-      key <- input$treeStatistics
-      metric_series_plot(key, TREE_METRIC_LABELS[[key]], state$metrics(),
-                         state$treatment_dates(),
-                         input$show_errorbars, input$show_treatments, input$plot_mode)
-    }, bg = "transparent", res = 110)
+    # Each card is a builder taking `light`: the screen render uses the Aurora
+    # palette, the SVG/PNG downloads re-run it light for a white page.
+    metric_card <- function(id, input_id, labels, prefix) {
+      plot_fn <- function(light = FALSE) {
+        key <- input[[input_id]]
+        metric_series_plot(key, labels[[key]], state$metrics(),
+                           state$treatment_dates(),
+                           input$show_errorbars, input$show_treatments,
+                           input$plot_mode, light = light)
+      }
+      output[[id]] <- renderPlot(plot_fn(), bg = "transparent", res = 110)
+      register_plot_download(output, id, plot_fn, prefix)
+    }
 
-    output$volumeStats <- renderPlot({
-      key <- input$volumeStatistics
-      metric_series_plot(key, VOLUME_METRIC_LABELS[[key]], state$metrics(),
-                         state$treatment_dates(),
-                         input$show_errorbars, input$show_treatments, input$plot_mode)
-    }, bg = "transparent", res = 110)
-
-    output$canopyStats <- renderPlot({
-      key <- input$canopyStatistics
-      metric_series_plot(key, CANOPY_METRIC_LABELS[[key]], state$metrics(),
-                         state$treatment_dates(),
-                         input$show_errorbars, input$show_treatments, input$plot_mode)
-    }, bg = "transparent", res = 110)
+    metric_card("treeStats",   "treeStatistics",   TREE_METRIC_LABELS,   "tree_stats")
+    metric_card("volumeStats", "volumeStatistics", VOLUME_METRIC_LABELS, "volume_stats")
+    metric_card("canopyStats", "canopyStatistics", CANOPY_METRIC_LABELS, "canopy_stats")
 
     # -- Points2Pano viewer --------------------------------------------------
     pano_idx <- reactiveVal(1)
