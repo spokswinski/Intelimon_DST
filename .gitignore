@@ -10,3 +10,4 @@ renv/python/
 renv/sandbox/
 renv/staging/
 rsconnect/
+.claude/
