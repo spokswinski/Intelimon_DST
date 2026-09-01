@@ -672,6 +672,93 @@ main > .container-fluid,
 .card:has(> .card-body > .imn-plot-wrap):focus-within .imn-plot-dl,
 .imn-plot-dl.show, .imn-plot-dl:has(.show){ opacity:1; pointer-events:auto; }
 
+/* ---------- Plot card Graph / Statistics toggle -------------------------
+   Upper-left segmented control on each plot card, mirroring the pill tabs on
+   the Forestry tool's right-hand card. It follows the Download menu's hover
+   behaviour so the plot is unobstructed while you read it - except when
+   Statistics is the active view, where the control is the only way back to
+   the graph and therefore stays put. ------------------------------------- */
+.imn-card-view{
+  position:absolute; left:4px; top:4px; z-index:6;
+  opacity:0; pointer-events:none; transition:opacity .15s ease-in-out;
+}
+.card:has(> .card-body > .imn-plot-wrap):hover .imn-card-view,
+.card:has(> .card-body > .imn-plot-wrap):focus-within .imn-card-view,
+.imn-plot-wrap:has(.imn-card-view input[value="stats"]:checked) .imn-card-view{
+  opacity:1; pointer-events:auto;
+}
+/* Shiny renders radioButtons() with Bootstrap 3 markup here
+   (label.radio-inline > input + span), so the segmented control is built on
+   that: the radio itself is hidden and carries the state, the span is the
+   button. The .form-check selectors cover the BS5 markup in case a future
+   bslib version switches. */
+.imn-card-view .control-label{ display:none; }
+/* bslib gives radio groups flex-wrap:wrap and a 16px gap, which breaks the
+   two buttons onto separate lines in a narrow card - hold them on one row. */
+.imn-card-view .shiny-options-group{
+  display:flex; flex-flow:row nowrap; gap:0; margin:0; white-space:nowrap;
+}
+.imn-card-view .radio-inline,
+.imn-card-view .form-check{
+  display:block; margin:0 !important; padding:0; min-height:0;
+}
+.imn-card-view input[type="radio"]{
+  position:absolute; opacity:0; width:0; height:0; margin:0; pointer-events:none;
+}
+.imn-card-view .radio-inline > span,
+.imn-card-view .form-check-label{
+  display:block; cursor:pointer; margin:0;
+  background:rgba(11,18,38,.72); border:1px solid var(--imn-border);
+  color:var(--imn-dim); font-size:11px; font-weight:600; line-height:1.3;
+  padding:.2rem .5rem; opacity:.85;
+}
+.imn-card-view .shiny-options-group > *:first-child > span,
+.imn-card-view .shiny-options-group > *:first-child .form-check-label{
+  border-radius:8px 0 0 8px;
+}
+.imn-card-view .shiny-options-group > *:last-child > span,
+.imn-card-view .shiny-options-group > *:last-child .form-check-label{
+  border-radius:0 8px 8px 0; border-left:none;
+}
+.imn-card-view .radio-inline:hover > span,
+.imn-card-view .form-check-label:hover{ color:var(--imn-text); opacity:1; }
+.imn-card-view .radio-inline:has(input:checked) > span,
+.imn-card-view .form-check:has(input:checked) .form-check-label{
+  background:rgba(143,240,226,.18); color:var(--imn-text); opacity:1;
+}
+.imn-card-view input[type="radio"]:focus-visible + span{
+  outline:2px solid var(--imn-accent); outline-offset:1px;
+}
+
+/* ---------- Plot card Statistics table --------------------------------- */
+.imn-stats{
+  height:100%; overflow:auto; padding:30px 4px 6px;
+}
+.imn-stats-title{
+  font-size:12.5px; font-weight:700; color:var(--imn-text);
+  text-align:center; margin-bottom:6px;
+}
+.imn-stats-table{
+  width:100%; border-collapse:collapse; font-size:12px; color:var(--imn-text);
+}
+.imn-stats-table th{
+  position:sticky; top:0; z-index:1;
+  background:#12203a; color:var(--imn-dim);
+  font-size:10.5px; font-weight:600; text-transform:uppercase; letter-spacing:.04em;
+  text-align:right; padding:4px 6px; border-bottom:1px solid var(--imn-border);
+  white-space:nowrap;
+}
+.imn-stats-table th:first-child{ text-align:left; }
+.imn-stats-table td{
+  padding:3px 6px; border-bottom:1px solid rgba(255,255,255,.06); white-space:nowrap;
+}
+.imn-stats-table td.num{ text-align:right; font-variant-numeric:tabular-nums; }
+.imn-stats-table td.lab{ text-align:left; color:var(--imn-dim); }
+.imn-stats-table tr:last-child td{ border-bottom:none; }
+.imn-stats-note{
+  font-size:10.5px; color:var(--imn-dim); line-height:1.35; margin-top:8px;
+}
+
 /* Send bslib's full-screen button to the lower LEFT on every card that has
    one - plot cards, Points2Pano and the selection map alike - so the expand
    control sits in the same corner everywhere and the plot cards' Download

@@ -13,7 +13,8 @@ box::use(
   data.table[...],
 )
 box::use(
-  app/logic/plotting[metric_series_plot, plot_card_ui, register_plot_download],
+  app/logic/plotting[metric_series_plot, metric_series_stats, plot_card_ui,
+                     register_plot_download, register_plot_stats],
   app/logic/constants[
     PANO_CROP_TOP, PANO_CROP_BOTTOM, PANO_CROP_LEFT, PANO_CROP_RIGHT
   ],
@@ -135,8 +136,18 @@ server <- function(id, state) {
                            input$plot_mode_pm, input$data_type_pm,
                            light = light)
       }
+      stats_fn <- function() {
+        key <- input[[input_id]]
+        shiny::validate(shiny::need(
+          nzchar(key),
+          "No models loaded - press Get Data on the Selection Map tab."
+        ))
+        metric_series_stats(key, key, state$additional_models_wide(),
+                            state$treatment_dates(), input$data_type_pm)
+      }
       output[[id]] <- renderPlot(plot_fn(), bg = "transparent", res = 110)
       register_plot_download(output, id, plot_fn, id)
+      register_plot_stats(output, id, stats_fn)
     }
 
     model_card("modelA", "model_a")

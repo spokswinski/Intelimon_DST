@@ -6,7 +6,7 @@
 
 box::use(
   data.table[data.table, as.data.table, copy, dcast, setorder],
-  stats[sd],
+  stats[sd, median],
 )
 
 #' Parse a comma-separated string of YYYYMMDD dates; returns list(ok, bad).
@@ -127,6 +127,45 @@ aggregate_time_steps <- function(df) {
     sd   = sd(value),      # NA when a step holds a single scan
     n    = .N
   ), by = grp][order(t)]
+}
+
+# Most frequent value, at 3 significant figures. Lidar metrics are continuous
+# measurements that essentially never repeat to full precision, so an exact
+# mode is undefined; rounding first answers the question people actually mean
+# ("what value did this group cluster on?"). NA when nothing repeats even at
+# that precision - reported as a dash rather than a misleading first value.
+.modal_value <- function(x) {
+  v <- x[is.finite(x)]
+  if (length(v) == 0) return(NA_real_)
+  r <- signif(v, 3)
+  u <- unique(r)
+  cnt <- tabulate(match(r, u))
+  if (max(cnt) < 2) return(NA_real_)
+  u[which.max(cnt)]          # ties resolve to the first-occurring value
+}
+
+#' Descriptive statistics per time step, for the Statistics view on the plot
+#' cards. Takes the long table from assign_time_steps() (optionally already
+#' run through percent_change_series(), in which case the statistics describe
+#' percent change) and returns one row per time step:
+#'
+#'   date | n | min | max | mean | median | mode | sd
+#'
+#' `date` is the step's mean scan date, matching the x positions the time
+#' series and bar modes plot. `sd` is NA for a step holding a single scan.
+describe_time_steps <- function(long) {
+  if (nrow(long) == 0) return(data.table())
+
+  long[, .(
+    date   = mean(scan_date),
+    n      = .N,
+    min    = min(value),
+    max    = max(value),
+    mean   = mean(value),
+    median = median(value),
+    mode   = .modal_value(value),
+    sd     = sd(value)
+  ), by = grp][order(date)]
 }
 
 #' assign_time_steps() + aggregate_time_steps() in one call, on raw values.

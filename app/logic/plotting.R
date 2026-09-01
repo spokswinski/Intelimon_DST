@@ -25,13 +25,14 @@
 # ---------------------------------------------------------------------------
 
 box::use(
-  shiny[div, tags, plotOutput, downloadLink, downloadHandler, outputOptions],
+  shiny[div, tags, plotOutput, downloadLink, downloadHandler, outputOptions,
+        radioButtons, conditionalPanel, uiOutput, renderUI],
   ggplot2[...],
   stats[approx],
   grid[unit],
   data.table[fwrite, setnames],
   app/logic/series[assign_time_steps, aggregate_time_steps,
-                   percent_change_series],
+                   percent_change_series, describe_time_steps],
   app/logic/constants[DERIVED_METRICS],
 )
 
@@ -173,6 +174,42 @@ aurora_theme <- function(pal = SCREEN_PAL) {
   out[]
 }
 
+# Shared front half of every card: resolve the metric (including the derived
+# ones), check the data is usable, build the per-scan long rows and apply the
+# percent-change transform. The plot and the Statistics table both start here,
+# so they can never disagree about what they are describing.
+#
+# Returns list(raw, y_label, axis_label, pct). `y_label` names the metric for
+# the card title and CSV column; `axis_label` is what the y axis says, which
+# in percent mode drops the metric name - the title already carries it, and
+# the narrow cards clip a doubled-up label.
+.series_prep <- function(metric, y_label, data_dt, treat_dates,
+                         data_type = "raw") {
+  pct <- identical(data_type, "percent")
+  if (pct) y_label <- paste0(y_label, " (% change)")
+
+  if (metric %in% names(DERIVED_METRICS)) {
+    source_col <- DERIVED_METRICS[[metric]]$source
+    transform  <- DERIVED_METRICS[[metric]]$transform
+  } else {
+    source_col <- metric
+    transform  <- identity
+  }
+
+  shiny::validate(
+    shiny::need(nrow(data_dt) > 0,
+                "No data loaded - press Get Data on the Selection Map tab."),
+    shiny::need(source_col %in% names(data_dt),
+                paste0("Metric '", source_col, "' not found in the data table."))
+  )
+
+  raw <- assign_time_steps(data_dt, source_col, treat_dates, transform)
+  if (pct) raw <- percent_change_series(raw)
+
+  list(raw = raw, y_label = y_label, pct = pct,
+       axis_label = if (pct) "% change from first scan" else y_label)
+}
+
 #' Build a metric plot for one metric column of `data_dt`.
 #'
 #' The returned ggplot carries the raw per-scan rows behind it as the
@@ -192,36 +229,15 @@ metric_series_plot <- function(metric, y_label, data_dt, treat_dates,
                                light = FALSE) {
 
   pal <- if (isTRUE(light)) EXPORT_PAL else SCREEN_PAL
-  pct <- identical(data_type, "percent")
-  # y_label names the metric (card title, CSV column); axis_label is what the
-  # y axis says. In percent mode the axis drops the metric name - the title
-  # already carries it, and the narrow cards clip a doubled-up label.
-  if (pct) y_label <- paste0(y_label, " (% change)")
-  axis_label <- if (pct) "% change from first scan" else y_label
-
-  if (metric %in% names(DERIVED_METRICS)) {
-    source_col <- DERIVED_METRICS[[metric]]$source
-    transform  <- DERIVED_METRICS[[metric]]$transform
-  } else {
-    source_col <- metric
-    transform  <- identity
-  }
-
-  shiny::validate(
-    shiny::need(nrow(data_dt) > 0,
-                "No data loaded - press Get Data on the Selection Map tab."),
-    shiny::need(source_col %in% names(data_dt),
-                paste0("Metric '", source_col, "' not found in the data table."))
-  )
+  prep <- .series_prep(metric, y_label, data_dt, treat_dates, data_type)
+  raw        <- prep$raw
+  y_label    <- prep$y_label
+  axis_label <- prep$axis_label
+  pct        <- prep$pct
+  export_dt  <- .export_table(raw, y_label)
 
   tvec <- .treat_vec(treat_dates)
   show_treat <- treatlines_on == "on" && length(tvec) > 0
-
-  # Raw rows, computed once: the CSV payload for every mode, and the plotting
-  # frame for the two modes that draw individual observations.
-  raw <- assign_time_steps(data_dt, source_col, treat_dates, transform)
-  if (pct) raw <- percent_change_series(raw)
-  export_dt <- .export_table(raw, y_label)
 
   # ---- Individual plot time series --------------------------------------
   plt <- if (mode == "individual") {
@@ -340,6 +356,52 @@ metric_series_plot <- function(metric, y_label, data_dt, treat_dates,
   plt
 }
 
+# Decimal places for a set of statistics: enough to separate the values
+# without printing noise. Driven by the magnitude of the largest one, so every
+# column of the table lines up on the same precision.
+.stat_digits <- function(x) {
+  m <- suppressWarnings(max(abs(x[is.finite(x)])))
+  if (!is.finite(m) || m == 0) return(2L)
+  as.integer(max(0, min(3, 3 - floor(log10(m)))))
+}
+
+.fmt_stat <- function(x, digits) {
+  ifelse(is.na(x), "—",
+         formatC(x, format = "f", digits = digits, big.mark = ","))
+}
+
+#' Per-time-step descriptive statistics for one metric card, formatted for the
+#' Statistics view. Same metric resolution, same time steps and the same
+#' percent-change transform the plot uses (see `.series_prep()`), so the table
+#' always describes exactly what the Graph view is drawing.
+#'
+#' Returns a data.frame of formatted character columns with the metric name
+#' carried on the "imn_label" attribute; `register_plot_stats()` renders it.
+#' @export
+metric_series_stats <- function(metric, y_label, data_dt, treat_dates,
+                                data_type = "raw") {
+  prep <- .series_prep(metric, y_label, data_dt, treat_dates, data_type)
+
+  smry <- describe_time_steps(prep$raw)
+  shiny::validate(shiny::need(
+    nrow(smry) > 0, "No valid values for this metric in the loaded scans."))
+
+  d <- .stat_digits(unlist(smry[, list(min, max, mean, median, mode, sd)]))
+  out <- data.frame(
+    `Time step` = format(smry$date, "%Y-%m-%d"),
+    n           = as.character(smry$n),
+    Min         = .fmt_stat(smry$min, d),
+    Max         = .fmt_stat(smry$max, d),
+    Mean        = .fmt_stat(smry$mean, d),
+    Median      = .fmt_stat(smry$median, d),
+    Mode        = .fmt_stat(smry$mode, d),
+    SD          = .fmt_stat(smry$sd, d),
+    check.names = FALSE, stringsAsFactors = FALSE
+  )
+  attr(out, "imn_label") <- prep$y_label
+  out
+}
+
 #' Wrap a `metric_series_plot()` card with a "Download" menu in its lower-right
 #' corner (CSV of the underlying data, or an SVG/PNG of the rendered plot).
 #' The menu is hidden until the card is hovered - see .imn-plot-dl in
@@ -348,9 +410,28 @@ metric_series_plot <- function(metric, y_label, data_dt, treat_dates,
 #' server.
 #' @export
 plot_card_ui <- function(ns, id, height = "100%") {
+  view <- paste0(id, "_view")
   div(
     class = "imn-plot-wrap",
-    plotOutput(ns(id), height = height),
+    # Graph / Statistics toggle, upper left. Hidden until the card is hovered
+    # (styles.css keeps it visible whenever Statistics is the active view, so
+    # there is always a way back to the plot).
+    div(
+      class = "imn-card-view",
+      radioButtons(ns(view), label = NULL, inline = TRUE,
+                   choices = list("Graph" = "graph", "Statistics" = "stats"),
+                   selected = "graph")
+    ),
+    conditionalPanel(
+      condition = sprintf("input['%s'] != 'stats'", ns(view)),
+      style = "height:100%;",
+      plotOutput(ns(id), height = height)
+    ),
+    conditionalPanel(
+      condition = sprintf("input['%s'] == 'stats'", ns(view)),
+      style = "height:100%;",
+      div(class = "imn-stats", uiOutput(ns(paste0(id, "_stats"))))
+    ),
     div(
       class = "dropdown imn-plot-dl",
       tags$button(
@@ -369,6 +450,35 @@ plot_card_ui <- function(ns, id, height = "100%") {
       )
     )
   )
+}
+
+#' Render the Statistics view for one card. `stats_fn` is a function of no
+#' arguments returning `metric_series_stats()` output.
+#' @export
+register_plot_stats <- function(output, id, stats_fn) {
+  output[[paste0(id, "_stats")]] <- renderUI({
+    df  <- stats_fn()
+    lab <- attr(df, "imn_label")
+
+    tags$div(
+      tags$div(class = "imn-stats-title", lab),
+      tags$table(
+        class = "imn-stats-table",
+        tags$thead(tags$tr(lapply(names(df), tags$th))),
+        tags$tbody(lapply(seq_len(nrow(df)), function(i) {
+          tags$tr(lapply(seq_along(df), function(j) {
+            tags$td(class = if (j == 1) "lab" else "num", df[i, j])
+          }))
+        }))
+      ),
+      tags$div(
+        class = "imn-stats-note",
+        "One row per time step (see Help). Mode is the most frequent value at ",
+        "3 significant figures, and reads — when no value repeats; SD is ",
+        "— for a step holding a single scan."
+      )
+    )
+  })
 }
 
 #' Register the three download handlers behind `plot_card_ui()`'s menu.

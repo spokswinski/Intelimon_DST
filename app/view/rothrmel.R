@@ -15,7 +15,8 @@ box::use(
   data.table[...],
 )
 box::use(
-  app/logic/plotting[metric_series_plot, plot_card_ui, register_plot_download],
+  app/logic/plotting[metric_series_plot, metric_series_stats, plot_card_ui,
+                     register_plot_download, register_plot_stats],
   app/logic/fire_behavior[scan_fire_behavior, FIRE_METRIC_LABELS],
   app/logic/constants[
     PANO_CROP_TOP, PANO_CROP_BOTTOM, PANO_CROP_LEFT, PANO_CROP_RIGHT
@@ -240,8 +241,14 @@ server <- function(id, state) {
                            input$show_errorbars, input$show_treatments,
                            input$plot_mode, input$data_type, light = light)
       }
+      stats_fn <- function() {
+        key <- input[[input_id]]
+        metric_series_stats(key, FIRE_METRIC_LABELS[[key]], fire_behavior(),
+                            state$treatment_dates(), input$data_type)
+      }
       output[[id]] <- renderPlot(plot_fn(), bg = "transparent", res = 110)
       register_plot_download(output, id, plot_fn, id)
+      register_plot_stats(output, id, stats_fn)
     }
 
     fire_card("card1", "metric_1")

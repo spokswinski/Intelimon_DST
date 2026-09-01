@@ -13,7 +13,8 @@ box::use(
   data.table[...],
 )
 box::use(
-  app/logic/plotting[metric_series_plot, plot_card_ui, register_plot_download],
+  app/logic/plotting[metric_series_plot, metric_series_stats, plot_card_ui,
+                     register_plot_download, register_plot_stats],
   app/logic/series[parse_treatment_dates],
   app/logic/constants[
     TREE_METRIC_LABELS, VOLUME_METRIC_LABELS, CANOPY_METRIC_LABELS,
@@ -166,8 +167,14 @@ server <- function(id, state) {
                            input$show_errorbars, input$show_treatments,
                            input$plot_mode, input$data_type, light = light)
       }
+      stats_fn <- function() {
+        key <- input[[input_id]]
+        metric_series_stats(key, labels[[key]], state$metrics(),
+                            state$treatment_dates(), input$data_type)
+      }
       output[[id]] <- renderPlot(plot_fn(), bg = "transparent", res = 110)
       register_plot_download(output, id, plot_fn, prefix)
+      register_plot_stats(output, id, stats_fn)
     }
 
     metric_card("treeStats",   "treeStatistics",   TREE_METRIC_LABELS,   "tree_stats")
