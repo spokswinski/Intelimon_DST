@@ -86,11 +86,39 @@ assign_time_steps <- function(metrics_dt, metric_col, treat_dates,
   df[]
 }
 
+#' Rewrite assign_time_steps() values as percent change from each site/plot's
+#' OWN baseline - its earliest scan in the loaded set. Every series therefore
+#' starts at 0% and the cards read as change since the first scan rather than
+#' absolute units, which lets plots on different scales be compared directly.
+#'
+#' Baselines are per site/plot rather than a single pooled first time step:
+#' plots are not all scanned on the same dates, and a pooled baseline would
+#' fold between-plot differences into what should be a within-plot change.
+#' Combos whose baseline is missing or zero are dropped - percent change from
+#' zero is undefined. The divisor is abs(baseline) so the sign of the change
+#' survives a negative baseline.
+#'
+#' Takes and returns the long table from assign_time_steps() (same columns),
+#' so it slots in ahead of aggregate_time_steps() or straight into the
+#' per-observation plot modes.
+percent_change_series <- function(long) {
+  if (nrow(long) == 0) return(long)
+
+  df <- copy(long)
+  setorder(df, combo, scan_date)
+  df[, base := value[1L], by = combo]
+  df <- df[is.finite(base) & base != 0]
+  if (nrow(df) == 0) return(df)
+
+  df[, value := (value - base) / abs(base) * 100]
+  df[, base := NULL]
+  setorder(df, scan_date)
+  df[]
+}
+
 #' Aggregate assign_time_steps() output to one row per time step:
-#' t (mean date), mean, sd, n. Used by the default "time series" plot mode.
-build_metric_series <- function(metrics_dt, metric_col, treat_dates,
-                                transform = identity) {
-  df <- assign_time_steps(metrics_dt, metric_col, treat_dates, transform)
+#' t (mean date), mean, sd, n. Used by the "time series" and "bar" modes.
+aggregate_time_steps <- function(df) {
   if (nrow(df) == 0) return(df)
 
   df[, .(
@@ -99,6 +127,14 @@ build_metric_series <- function(metrics_dt, metric_col, treat_dates,
     sd   = sd(value),      # NA when a step holds a single scan
     n    = .N
   ), by = grp][order(t)]
+}
+
+#' assign_time_steps() + aggregate_time_steps() in one call, on raw values.
+build_metric_series <- function(metrics_dt, metric_col, treat_dates,
+                                transform = identity) {
+  aggregate_time_steps(
+    assign_time_steps(metrics_dt, metric_col, treat_dates, transform)
+  )
 }
 
 #' Reshape the long additional_models table (one row per model per scan) into

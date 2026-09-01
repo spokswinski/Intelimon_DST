@@ -38,6 +38,11 @@ ui <- function(id) {
                       "Box and Whisker"             = "boxplot",
                       "Bar"                          = "bar"),
                     selected = "timeseries", width = "100%"),
+        selectInput(ns("data_type_pm"), "Data type",
+                    choices = list(
+                      "Raw data"       = "raw",
+                      "Percent change" = "percent"),
+                    selected = "raw", width = "100%"),
         radioButtons(ns("show_treatments_pm"), "Treatment date lines",
                      choices = list("On" = "on", "Off" = "off"),
                      selected = "on", inline = TRUE, width = "100%"),
@@ -63,11 +68,11 @@ ui <- function(id) {
           row_sizes = c("1fr", "1fr"),
           col_sizes = c("1fr", "1fr"),
           gap_size = "10px",
-          grid_card(area = "modelA",
+          grid_card(area = "modelA", full_screen = TRUE,
                     card_body(plot_card_ui(ns, "modelA"))),
-          grid_card(area = "modelB",
+          grid_card(area = "modelB", full_screen = TRUE,
                     card_body(plot_card_ui(ns, "modelB"))),
-          grid_card(area = "modelC",
+          grid_card(area = "modelC", full_screen = TRUE,
                     card_body(plot_card_ui(ns, "modelC"))),
           grid_card(
             area = "panoViewer",
@@ -127,7 +132,8 @@ server <- function(id, state) {
         metric_series_plot(key, key, state$additional_models_wide(),
                            state$treatment_dates(),
                            input$show_errorbars_pm, input$show_treatments_pm,
-                           input$plot_mode_pm, light = light)
+                           input$plot_mode_pm, input$data_type_pm,
+                           light = light)
       }
       output[[id]] <- renderPlot(plot_fn(), bg = "transparent", res = 110)
       register_plot_download(output, id, plot_fn, id)

@@ -11,6 +11,10 @@
 #                  time on the X axis
 #   "bar"        - mean per time step as bars, time on the X axis
 #
+# Every mode plots either the raw metric values or percent change from each
+# site/plot's own first scan, chosen with the "Data type" dropdown in each
+# tab's sidebar (see percent_change_series() in app/logic/series.R).
+#
 # Plots render with a transparent background and light text so they sit on the
 # Aurora Glass cards; see aurora_theme(). Data points are enlarged diamonds,
 # treatment lines are thick coral verticals.
@@ -26,7 +30,8 @@ box::use(
   stats[approx],
   grid[unit],
   data.table[fwrite, setnames],
-  app/logic/series[build_metric_series, assign_time_steps],
+  app/logic/series[assign_time_steps, aggregate_time_steps,
+                   percent_change_series],
   app/logic/constants[DERIVED_METRICS],
 )
 
@@ -174,14 +179,25 @@ aurora_theme <- function(pal = SCREEN_PAL) {
 #' "imn_raw" attribute; `register_plot_download()` writes that as the CSV.
 #'
 #' @param mode "timeseries" | "individual" | "boxplot" | "bar"
+#' @param data_type "raw" plots the metric's own units; "percent" plots
+#'   percent change from each site/plot's first scan. The axis, title and CSV
+#'   column all pick up the "(% change)" suffix, and a dashed zero line marks
+#'   the baseline.
 #' @param light TRUE swaps the on-screen Aurora palette for the light-ground
 #'   EXPORT palette used by the SVG/PNG downloads.
 #' @export
 metric_series_plot <- function(metric, y_label, data_dt, treat_dates,
                                errorbars_on, treatlines_on,
-                               mode = "timeseries", light = FALSE) {
+                               mode = "timeseries", data_type = "raw",
+                               light = FALSE) {
 
   pal <- if (isTRUE(light)) EXPORT_PAL else SCREEN_PAL
+  pct <- identical(data_type, "percent")
+  # y_label names the metric (card title, CSV column); axis_label is what the
+  # y axis says. In percent mode the axis drops the metric name - the title
+  # already carries it, and the narrow cards clip a doubled-up label.
+  if (pct) y_label <- paste0(y_label, " (% change)")
+  axis_label <- if (pct) "% change from first scan" else y_label
 
   if (metric %in% names(DERIVED_METRICS)) {
     source_col <- DERIVED_METRICS[[metric]]$source
@@ -204,6 +220,7 @@ metric_series_plot <- function(metric, y_label, data_dt, treat_dates,
   # Raw rows, computed once: the CSV payload for every mode, and the plotting
   # frame for the two modes that draw individual observations.
   raw <- assign_time_steps(data_dt, source_col, treat_dates, transform)
+  if (pct) raw <- percent_change_series(raw)
   export_dt <- .export_table(raw, y_label)
 
   # ---- Individual plot time series --------------------------------------
@@ -229,7 +246,7 @@ metric_series_plot <- function(metric, y_label, data_dt, treat_dates,
                  na.rm = TRUE) +
       scale_x_date(expand = expansion(mult = 0.05)) +
       y_scale() +
-      labs(x = "Scan date", y = y_label, title = y_label,
+      labs(x = "Scan date", y = axis_label, title = y_label,
            color = "Site / Plot", fill = "Site / Plot") +
       aurora_theme(pal) +
       theme(legend.position = "right", legend.key.size = unit(0.9, "lines"))
@@ -257,13 +274,13 @@ metric_series_plot <- function(metric, y_label, data_dt, treat_dates,
                  position = position_jitter(width = 0.12, height = 0, seed = 42),
                  na.rm = TRUE) +
       y_scale() +
-      labs(x = "Scan date (time step)", y = y_label, title = y_label) +
+      labs(x = "Scan date (time step)", y = axis_label, title = y_label) +
       aurora_theme(pal) +
       theme(axis.text.x = element_text(angle = 35, hjust = 1))
 
   # ---- Bar: mean per time step (time on X) ------------------------------
   } else if (mode == "bar") {
-    smry <- build_metric_series(data_dt, source_col, treat_dates, transform)
+    smry <- aggregate_time_steps(raw)
     shiny::validate(shiny::need(
       nrow(smry) > 0, "No valid values for this metric in the loaded scans."))
     labs_chr <- format(smry$t, "%Y-%m-%d")
@@ -284,13 +301,13 @@ metric_series_plot <- function(metric, y_label, data_dt, treat_dates,
     }
     p +
       y_scale() +
-      labs(x = "Scan date (time step)", y = y_label, title = y_label) +
+      labs(x = "Scan date (time step)", y = axis_label, title = y_label) +
       aurora_theme(pal) +
       theme(axis.text.x = element_text(angle = 35, hjust = 1))
 
   # ---- Time series (default) --------------------------------------------
   } else {
-    smry <- build_metric_series(data_dt, source_col, treat_dates, transform)
+    smry <- aggregate_time_steps(raw)
     shiny::validate(shiny::need(
       nrow(smry) > 0, "No valid values for this metric in the loaded scans."))
 
@@ -309,17 +326,26 @@ metric_series_plot <- function(metric, y_label, data_dt, treat_dates,
                  color = pal$stroke, fill = pal$point, na.rm = TRUE) +
       scale_x_date(limits = range(smry$t), expand = expansion(mult = 0.05)) +
       y_scale() +
-      labs(x = "Scan date", y = y_label, title = y_label) +
+      labs(x = "Scan date", y = axis_label, title = y_label) +
       aurora_theme(pal)
+  }
+
+  # Percent-change cards get a zero rule: the baseline every series starts at.
+  if (pct) {
+    plt <- plt + geom_hline(yintercept = 0, color = pal$txt_dim,
+                            linetype = "dashed", linewidth = 0.4)
   }
 
   attr(plt, "imn_raw") <- export_dt
   plt
 }
 
-#' Wrap a `metric_series_plot()` card with a "Download" menu pinned to its
-#' lower-right corner (CSV of the underlying data, or an SVG/PNG of the
-#' rendered plot). Pair with `register_plot_download()` in the module server.
+#' Wrap a `metric_series_plot()` card with a "Download" menu in its lower-right
+#' corner (CSV of the underlying data, or an SVG/PNG of the rendered plot).
+#' The menu is hidden until the card is hovered - see .imn-plot-dl in
+#' app/static/styles.css, which also moves bslib's full-screen expand button
+#' to the opposite corner. Pair with `register_plot_download()` in the module
+#' server.
 #' @export
 plot_card_ui <- function(ns, id, height = "100%") {
   div(
