@@ -445,9 +445,23 @@ main, main > .container-fluid,
 .imn-sponsor.bia{ height:36px !important; }
 .imn-sponsor.serdp{ height:26px !important; }
 
-/* Bigger navbar brand logo */
-.imn-logo{ width:40px !important; height:40px !important; }
-.imn-brand-title{ font-size:18px !important; }
+/* Brand lockup: sized from the viewport, not fixed pixels.
+   The mark and the wordmark were pinned at 40px / 18px, so on a wide or
+   scaled display the hex shrank against the type it sits next to and the
+   header read as text with a stray icon. Scaling all three from the same vw
+   value keeps their proportions - and the lockup's weight against the
+   sponsor plate in the footer - constant at any resolution; clamp() holds
+   the ends so it neither vanishes on a laptop nor dominates a 4K header. */
+.imn-brand{ gap:clamp(9px, .85vw, 15px) !important; }
+.imn-logo{
+  width:clamp(46px, 3vw, 56px) !important;
+  height:clamp(46px, 3vw, 56px) !important;
+}
+.imn-brand-title{ font-size:clamp(18px, 1.25vw, 23px) !important; }
+.imn-brand-sub{
+  font-size:clamp(9px, .58vw, 11px) !important;
+  letter-spacing:.15em !important;
+}
 
 /* =========================================================================
    Forestry tool
