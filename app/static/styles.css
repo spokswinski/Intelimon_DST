@@ -445,9 +445,38 @@ main, main > .container-fluid,
 .imn-sponsor.bia{ height:36px !important; }
 .imn-sponsor.serdp{ height:26px !important; }
 
-/* Bigger navbar brand logo */
-.imn-logo{ width:40px !important; height:40px !important; }
-.imn-brand-title{ font-size:18px !important; }
+/* Brand lockup: sized from the viewport, not fixed pixels.
+   The mark and the wordmark were pinned at 40px / 18px, so on a wide or
+   scaled display the hex shrank against the type it sits next to and the
+   header read as text with a stray icon. Scaling all three from the same vw
+   value keeps their proportions - and the lockup's weight against the
+   sponsor plate in the footer - constant at any resolution; clamp() holds
+   the ends so it neither vanishes on a laptop nor dominates a 4K header. */
+.imn-brand{ gap:clamp(9px, .85vw, 15px) !important; }
+/* The mark links to intelimon.xyz (see app/main.R): give it a click
+   affordance and a visible focus ring, and keep the anchor from adding any
+   line-height of its own to the navbar. */
+.imn-logo-link{
+  display:flex; align-items:center; line-height:0; border-radius:10px;
+  transition:transform .12s ease-out, filter .12s ease-out;
+}
+.imn-logo-link:hover{ transform:scale(1.04); filter:brightness(1.12); }
+.imn-logo-link:focus-visible{
+  outline:2px solid var(--imn-accent); outline-offset:3px;
+}
+@media (prefers-reduced-motion: reduce){
+  .imn-logo-link{ transition:none; }
+  .imn-logo-link:hover{ transform:none; }
+}
+.imn-logo{
+  width:clamp(46px, 3vw, 56px) !important;
+  height:clamp(46px, 3vw, 56px) !important;
+}
+.imn-brand-title{ font-size:clamp(18px, 1.25vw, 23px) !important; }
+.imn-brand-sub{
+  font-size:clamp(9px, .58vw, 11px) !important;
+  letter-spacing:.15em !important;
+}
 
 /* =========================================================================
    Forestry tool
@@ -637,11 +666,136 @@ main > .container-fluid,
 .imn-fval{ font-family:'JetBrains Mono',monospace; font-size:12px;
   color:var(--imn-accent2); text-align:right; }
 
+/* ---------- Navbar selection readout ("n scans from n plots selected") ----
+   Sits at the right-hand end of the navbar, past the Help tab. Styled as a
+   readout chip rather than a nav link so it does not look clickable. ------- */
+.imn-scancount{
+  display:flex; align-items:center; white-space:nowrap;
+  height:100%; margin-left:.4rem; padding:.26rem .7rem;
+  background:var(--imn-panel-2); border:1px solid var(--imn-border);
+  border-radius:10px; color:var(--imn-text);
+  font-size:12px; font-weight:600; letter-spacing:.01em;
+}
+.navbar .nav-item:has(.imn-scancount){ display:flex; align-items:center; }
+
+@media (max-width: 900px){
+  .imn-scancount{ font-size:11px; padding:.2rem .5rem; }
+}
+
 /* ---------- Plot card download menu (Direct outputs / Predictive models /
-   rothRmel): a "Download" dropdown pinned to the card's lower-right corner
-   offering CSV data, SVG image or PNG image of that card's plot. ---------- */
+   rothRmel): a "Download" dropdown offering CSV data, SVG image or PNG image
+   of that card's plot. Like bslib's full-screen control it stays invisible
+   until the card is hovered, so nothing sits on top of the plot while you
+   are reading it - and it takes the lower-RIGHT corner, opposite the expand
+   button (moved to the lower left app-wide by the rule below). ----------- */
 .imn-plot-wrap{ position:relative; width:100%; height:100%; }
-.imn-plot-dl{ position:absolute; right:4px; bottom:4px; z-index:5; }
+.imn-plot-dl{
+  position:absolute; right:4px; bottom:4px; z-index:5;
+  opacity:0; pointer-events:none; transition:opacity .15s ease-in-out;
+}
+/* Reveal on hover/focus of the plot's OWN card, and hold it visible while its
+   menu is open. The `> .card-body >` steps matter: these cards are nested
+   inside an outer grid card, and a plain descendant selector would light up
+   every plot's menu as soon as the pointer entered any of them. */
+.card:has(> .card-body > .imn-plot-wrap):hover .imn-plot-dl,
+.card:has(> .card-body > .imn-plot-wrap):focus-within .imn-plot-dl,
+.imn-plot-dl.show, .imn-plot-dl:has(.show){ opacity:1; pointer-events:auto; }
+
+/* ---------- Plot card Graph / Statistics toggle -------------------------
+   Upper-left segmented control on each plot card, mirroring the pill tabs on
+   the Forestry tool's right-hand card. It follows the Download menu's hover
+   behaviour so the plot is unobstructed while you read it - except when
+   Statistics is the active view, where the control is the only way back to
+   the graph and therefore stays put. ------------------------------------- */
+.imn-card-view{
+  position:absolute; left:4px; top:4px; z-index:6;
+  opacity:0; pointer-events:none; transition:opacity .15s ease-in-out;
+}
+.card:has(> .card-body > .imn-plot-wrap):hover .imn-card-view,
+.card:has(> .card-body > .imn-plot-wrap):focus-within .imn-card-view,
+.imn-plot-wrap:has(.imn-card-view input[value="stats"]:checked) .imn-card-view{
+  opacity:1; pointer-events:auto;
+}
+/* Shiny renders radioButtons() with Bootstrap 3 markup here
+   (label.radio-inline > input + span), so the segmented control is built on
+   that: the radio itself is hidden and carries the state, the span is the
+   button. The .form-check selectors cover the BS5 markup in case a future
+   bslib version switches. */
+.imn-card-view .control-label{ display:none; }
+/* bslib gives radio groups flex-wrap:wrap and a 16px gap, which breaks the
+   two buttons onto separate lines in a narrow card - hold them on one row. */
+.imn-card-view .shiny-options-group{
+  display:flex; flex-flow:row nowrap; gap:0; margin:0; white-space:nowrap;
+}
+.imn-card-view .radio-inline,
+.imn-card-view .form-check{
+  display:block; margin:0 !important; padding:0; min-height:0;
+}
+.imn-card-view input[type="radio"]{
+  position:absolute; opacity:0; width:0; height:0; margin:0; pointer-events:none;
+}
+.imn-card-view .radio-inline > span,
+.imn-card-view .form-check-label{
+  display:block; cursor:pointer; margin:0;
+  background:rgba(11,18,38,.72); border:1px solid var(--imn-border);
+  color:var(--imn-dim); font-size:11px; font-weight:600; line-height:1.3;
+  padding:.2rem .5rem; opacity:.85;
+}
+.imn-card-view .shiny-options-group > *:first-child > span,
+.imn-card-view .shiny-options-group > *:first-child .form-check-label{
+  border-radius:8px 0 0 8px;
+}
+.imn-card-view .shiny-options-group > *:last-child > span,
+.imn-card-view .shiny-options-group > *:last-child .form-check-label{
+  border-radius:0 8px 8px 0; border-left:none;
+}
+.imn-card-view .radio-inline:hover > span,
+.imn-card-view .form-check-label:hover{ color:var(--imn-text); opacity:1; }
+.imn-card-view .radio-inline:has(input:checked) > span,
+.imn-card-view .form-check:has(input:checked) .form-check-label{
+  background:rgba(143,240,226,.18); color:var(--imn-text); opacity:1;
+}
+.imn-card-view input[type="radio"]:focus-visible + span{
+  outline:2px solid var(--imn-accent); outline-offset:1px;
+}
+
+/* ---------- Plot card Statistics table --------------------------------- */
+.imn-stats{
+  height:100%; overflow:auto; padding:30px 4px 6px;
+}
+.imn-stats-title{
+  font-size:12.5px; font-weight:700; color:var(--imn-text);
+  text-align:center; margin-bottom:6px;
+}
+.imn-stats-table{
+  width:100%; border-collapse:collapse; font-size:12px; color:var(--imn-text);
+}
+.imn-stats-table th{
+  position:sticky; top:0; z-index:1;
+  background:#12203a; color:var(--imn-dim);
+  font-size:10.5px; font-weight:600; text-transform:uppercase; letter-spacing:.04em;
+  text-align:right; padding:4px 6px; border-bottom:1px solid var(--imn-border);
+  white-space:nowrap;
+}
+.imn-stats-table th:first-child{ text-align:left; }
+.imn-stats-table td{
+  padding:3px 6px; border-bottom:1px solid rgba(255,255,255,.06); white-space:nowrap;
+}
+.imn-stats-table td.num{ text-align:right; font-variant-numeric:tabular-nums; }
+.imn-stats-table td.lab{ text-align:left; color:var(--imn-dim); }
+.imn-stats-table tr:last-child td{ border-bottom:none; }
+.imn-stats-note{
+  font-size:10.5px; color:var(--imn-dim); line-height:1.35; margin-top:8px;
+}
+
+/* Send bslib's full-screen button to the lower LEFT on every card that has
+   one - plot cards, Points2Pano and the selection map alike - so the expand
+   control sits in the same corner everywhere and the plot cards' Download
+   menu has the lower right to itself. */
+.card{
+  --bslib-full-screen-enter-right: auto;
+  --bslib-full-screen-enter-left: 4px;
+}
 .imn-plot-dl .btn{
   background:rgba(11,18,38,.72) !important; border:1px solid var(--imn-border) !important;
   color:var(--imn-dim) !important; font-size:11px !important; font-weight:600;

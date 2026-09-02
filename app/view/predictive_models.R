@@ -13,7 +13,8 @@ box::use(
   data.table[...],
 )
 box::use(
-  app/logic/plotting[metric_series_plot, plot_card_ui, register_plot_download],
+  app/logic/plotting[metric_series_plot, metric_series_stats, plot_card_ui,
+                     register_plot_download, register_plot_stats],
   app/logic/constants[
     PANO_CROP_TOP, PANO_CROP_BOTTOM, PANO_CROP_LEFT, PANO_CROP_RIGHT
   ],
@@ -38,6 +39,11 @@ ui <- function(id) {
                       "Box and Whisker"             = "boxplot",
                       "Bar"                          = "bar"),
                     selected = "timeseries", width = "100%"),
+        selectInput(ns("data_type_pm"), "Data type",
+                    choices = list(
+                      "Raw data"       = "raw",
+                      "Percent change" = "percent"),
+                    selected = "raw", width = "100%"),
         radioButtons(ns("show_treatments_pm"), "Treatment date lines",
                      choices = list("On" = "on", "Off" = "off"),
                      selected = "on", inline = TRUE, width = "100%"),
@@ -63,11 +69,11 @@ ui <- function(id) {
           row_sizes = c("1fr", "1fr"),
           col_sizes = c("1fr", "1fr"),
           gap_size = "10px",
-          grid_card(area = "modelA",
+          grid_card(area = "modelA", full_screen = TRUE,
                     card_body(plot_card_ui(ns, "modelA"))),
-          grid_card(area = "modelB",
+          grid_card(area = "modelB", full_screen = TRUE,
                     card_body(plot_card_ui(ns, "modelB"))),
-          grid_card(area = "modelC",
+          grid_card(area = "modelC", full_screen = TRUE,
                     card_body(plot_card_ui(ns, "modelC"))),
           grid_card(
             area = "panoViewer",
@@ -127,10 +133,21 @@ server <- function(id, state) {
         metric_series_plot(key, key, state$additional_models_wide(),
                            state$treatment_dates(),
                            input$show_errorbars_pm, input$show_treatments_pm,
-                           input$plot_mode_pm, light = light)
+                           input$plot_mode_pm, input$data_type_pm,
+                           light = light)
+      }
+      stats_fn <- function() {
+        key <- input[[input_id]]
+        shiny::validate(shiny::need(
+          nzchar(key),
+          "No models loaded - press Get Data on the Selection Map tab."
+        ))
+        metric_series_stats(key, key, state$additional_models_wide(),
+                            state$treatment_dates(), input$data_type_pm)
       }
       output[[id]] <- renderPlot(plot_fn(), bg = "transparent", res = 110)
       register_plot_download(output, id, plot_fn, id)
+      register_plot_stats(output, id, stats_fn)
     }
 
     model_card("modelA", "model_a")

@@ -15,7 +15,8 @@ box::use(
   data.table[...],
 )
 box::use(
-  app/logic/plotting[metric_series_plot, plot_card_ui, register_plot_download],
+  app/logic/plotting[metric_series_plot, metric_series_stats, plot_card_ui,
+                     register_plot_download, register_plot_stats],
   app/logic/fire_behavior[scan_fire_behavior, FIRE_METRIC_LABELS],
   app/logic/constants[
     PANO_CROP_TOP, PANO_CROP_BOTTOM, PANO_CROP_LEFT, PANO_CROP_RIGHT
@@ -69,6 +70,11 @@ ui <- function(id) {
                       "Box and Whisker"             = "boxplot",
                       "Bar"                          = "bar"),
                     selected = "timeseries", width = "100%"),
+        selectInput(ns("data_type"), "Data type",
+                    choices = list(
+                      "Raw data"       = "raw",
+                      "Percent change" = "percent"),
+                    selected = "raw", width = "100%"),
         radioButtons(ns("show_treatments"), "Treatment date lines",
                      choices = list("On" = "on", "Off" = "off"),
                      selected = "on", inline = TRUE, width = "100%"),
@@ -136,11 +142,11 @@ ui <- function(id) {
           row_sizes = c("1fr", "1fr"),
           col_sizes = c("1fr", "1fr"),
           gap_size = "10px",
-          grid_card(area = "card1",
+          grid_card(area = "card1", full_screen = TRUE,
                     card_body(plot_card_ui(ns, "card1"))),
-          grid_card(area = "card2",
+          grid_card(area = "card2", full_screen = TRUE,
                     card_body(plot_card_ui(ns, "card2"))),
-          grid_card(area = "card3",
+          grid_card(area = "card3", full_screen = TRUE,
                     card_body(plot_card_ui(ns, "card3"))),
           grid_card(
             area = "panoViewer",
@@ -233,10 +239,16 @@ server <- function(id, state) {
         metric_series_plot(key, FIRE_METRIC_LABELS[[key]], fire_behavior(),
                            state$treatment_dates(),
                            input$show_errorbars, input$show_treatments,
-                           input$plot_mode, light = light)
+                           input$plot_mode, input$data_type, light = light)
+      }
+      stats_fn <- function() {
+        key <- input[[input_id]]
+        metric_series_stats(key, FIRE_METRIC_LABELS[[key]], fire_behavior(),
+                            state$treatment_dates(), input$data_type)
       }
       output[[id]] <- renderPlot(plot_fn(), bg = "transparent", res = 110)
       register_plot_download(output, id, plot_fn, id)
+      register_plot_stats(output, id, stats_fn)
     }
 
     fire_card("card1", "metric_1")

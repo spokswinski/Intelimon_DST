@@ -12,8 +12,10 @@
 # ---------------------------------------------------------------------------
 
 box::use(
-  shiny[NS, moduleServer, tags, includeCSS, div, span, img],
-  bslib[page_navbar, nav_panel, bs_theme],
+  shiny[NS, moduleServer, tags, includeCSS, div, span, img,
+        textOutput, renderText, outputOptions],
+  bslib[page_navbar, nav_panel, nav_spacer, nav_item, bs_theme],
+  data.table[uniqueN],
 )
 box::use(
   app/logic/app_state[new_app_state],
@@ -27,11 +29,18 @@ box::use(
   app/view/help,
 )
 
-# Navbar brand: logo + two-line wordmark.
+# Navbar brand: logo + two-line wordmark. The mark links to the IntELiMon
+# home page, opened in a new tab - a same-tab navigation would end the Shiny
+# session and discard the loaded scans behind an accidental click.
 brand_title <- function() {
   div(
     class = "imn-brand",
-    img(class = "imn-logo", src = logo_uri, alt = "IntELiMon logo"),
+    tags$a(
+      class = "imn-logo-link", href = "https://intelimon.xyz",
+      target = "_blank", rel = "noopener noreferrer",
+      title = "IntELiMon home page (opens in a new tab)",
+      img(class = "imn-logo", src = logo_uri, alt = "IntELiMon home page")
+    ),
     div(
       class = "imn-brand-text",
       span(class = "imn-brand-title", "IntELiMon"),
@@ -71,7 +80,14 @@ ui <- function(id) {
     nav_panel("Fuel tool",         fuel_tool$ui(ns("fuel_tool"))),
     nav_panel("Forestry tool",     forestry_tool$ui(ns("forestry_tool"))),
     nav_panel("rothRmel",          rothrmel$ui(ns("rothrmel"))),
-    nav_panel("Help",              help$ui(ns("help")))
+    nav_panel("Help",              help$ui(ns("help"))),
+    # Selection readout, pinned to the right-hand end of the navbar. It reads
+    # the shared state, so it stays correct from whichever tab is open.
+    nav_spacer(),
+    nav_item(
+      div(class = "imn-scancount",
+          textOutput(ns("scan_summary"), inline = TRUE))
+    )
   )
 }
 
@@ -94,6 +110,25 @@ server <- function(id) {
 
     # One shared state store for the whole session
     state <- new_app_state()
+
+    # Navbar selection readout. scan_calls carries one row per selected plot
+    # before Get Scans (date_code empty) and one row per scan after it, so the
+    # scan count is the populated rows and the plot count the distinct combos.
+    output$scan_summary <- renderText({
+      sc <- state$scan_calls()
+      if (nrow(sc) == 0) return("No plots selected")
+      n_plots <- uniqueN(sc, by = c("site_name", "plot"))
+      n_scans <- sum(nzchar(sc$date_code))
+      sprintf("%d scan%s from %d plot%s selected",
+              n_scans,  if (n_scans  == 1) "" else "s",
+              n_plots,  if (n_plots  == 1) "" else "s")
+    })
+
+    # Below the navbar breakpoint the readout collapses into the hamburger
+    # menu, and Shiny suspends hidden outputs - the chip would then show a
+    # stale count from before the menu closed. It is cheap to compute, so keep
+    # it live regardless of visibility.
+    outputOptions(output, "scan_summary", suspendWhenHidden = FALSE)
 
     selection_map$server("selection_map", state)
     direct_outputs$server("direct_outputs", state)

@@ -102,7 +102,13 @@ ui <- function(id) {
         .row("Box and Whisker",
              "The distribution across plots at each time step."),
         .row("Bar",
-             "Mean per time step, drawn as bars.")
+             "Mean per time step, drawn as bars."),
+        tags$p(class = "imn-help-intro",
+               "The \"Data type\" dropdown below it plots either the metric's own units or percent change:"),
+        .row("Raw data",
+             "The metric as measured, in its own units."),
+        .row("Percent change",
+             "Each site/plot expressed as percent change from its own first scan, so plots on different scales share one axis. A dashed line marks the 0% baseline; the CSV download follows the same values.")
       )
     ),
 
