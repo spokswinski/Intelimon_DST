@@ -29,11 +29,18 @@ box::use(
   app/view/help,
 )
 
-# Navbar brand: logo + two-line wordmark.
+# Navbar brand: logo + two-line wordmark. The mark links to the IntELiMon
+# home page, opened in a new tab - a same-tab navigation would end the Shiny
+# session and discard the loaded scans behind an accidental click.
 brand_title <- function() {
   div(
     class = "imn-brand",
-    img(class = "imn-logo", src = logo_uri, alt = "IntELiMon logo"),
+    tags$a(
+      class = "imn-logo-link", href = "https://intelimon.xyz",
+      target = "_blank", rel = "noopener noreferrer",
+      title = "IntELiMon home page (opens in a new tab)",
+      img(class = "imn-logo", src = logo_uri, alt = "IntELiMon home page")
+    ),
     div(
       class = "imn-brand-text",
       span(class = "imn-brand-title", "IntELiMon"),

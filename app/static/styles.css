@@ -453,6 +453,21 @@ main, main > .container-fluid,
    sponsor plate in the footer - constant at any resolution; clamp() holds
    the ends so it neither vanishes on a laptop nor dominates a 4K header. */
 .imn-brand{ gap:clamp(9px, .85vw, 15px) !important; }
+/* The mark links to intelimon.xyz (see app/main.R): give it a click
+   affordance and a visible focus ring, and keep the anchor from adding any
+   line-height of its own to the navbar. */
+.imn-logo-link{
+  display:flex; align-items:center; line-height:0; border-radius:10px;
+  transition:transform .12s ease-out, filter .12s ease-out;
+}
+.imn-logo-link:hover{ transform:scale(1.04); filter:brightness(1.12); }
+.imn-logo-link:focus-visible{
+  outline:2px solid var(--imn-accent); outline-offset:3px;
+}
+@media (prefers-reduced-motion: reduce){
+  .imn-logo-link{ transition:none; }
+  .imn-logo-link:hover{ transform:none; }
+}
 .imn-logo{
   width:clamp(46px, 3vw, 56px) !important;
   height:clamp(46px, 3vw, 56px) !important;
