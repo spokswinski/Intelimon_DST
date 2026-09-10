@@ -60,6 +60,7 @@ First time, from the project root (in R):
 
 ```r
 # 1. Bootstrap the project library (renv activates via .Rprofile on startup)
+renv::install("rstudio/gridlayout") #installs the unavailable "gridlayout"
 renv::install()     # installs the packages declared in dependencies.R
 renv::snapshot()    # writes a complete renv.lock for your environment
 
