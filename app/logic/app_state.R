@@ -13,10 +13,12 @@
 # `plots` is a plain (non-reactive) data.table: it is loaded once at startup
 # and never changes.
 # ---------------------------------------------------------------------------
+box::use(
+  data.table[data.table],
+  shiny[reactiveVal],
+)
 
 box::use(
-  shiny[reactiveVal],
-  data.table[data.table],
   app/logic/api_client[load_plots],
 )
 
@@ -40,7 +42,8 @@ new_app_state <- function() {
     load_plots(),
     error = function(e) {
       warning("Failed to load plot inventory: ", conditionMessage(e),
-              call. = FALSE)
+        call. = FALSE
+      )
       data.table(
         site_name = character(), plot = character(),
         Longitude = numeric(),   Latitude = numeric()
@@ -53,17 +56,17 @@ new_app_state <- function() {
     plots = plots,
 
     # reactive slots (were globals in the single-file app)
-    scan_calls             = reactiveVal(empty_scan_calls()),
-    metrics                = reactiveVal(data.table()),
-    tree_inventory         = reactiveVal(data.table()),
-    additional_models      = reactiveVal(data.table()),
+    scan_calls = reactiveVal(empty_scan_calls()),
+    metrics = reactiveVal(data.table()),
+    tree_inventory = reactiveVal(data.table()),
+    additional_models = reactiveVal(data.table()),
     additional_models_wide = reactiveVal(data.table()),
-    treatment_dates        = reactiveVal(character()),
-    aoi_polygon            = reactiveVal(NULL),
+    treatment_dates = reactiveVal(character()),
+    aoi_polygon = reactiveVal(NULL),
 
     # Surface fuel bed submitted from the Fuel tool tab (NULL until the user
     # presses "Submit fuel values"). Consumed by the rothRmel tab when its
     # fuel source is set to "Fuel tool values". See app/view/fuel_tool.R.
-    fuel_tool_values       = reactiveVal(NULL)
+    fuel_tool_values = reactiveVal(NULL)
   )
 }

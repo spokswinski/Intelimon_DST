@@ -5,21 +5,40 @@
 # (scan_calls, metrics, tree_inventory, additional_models,
 # additional_models_wide, treatment_dates); other tabs read from it.
 # ---------------------------------------------------------------------------
+box::use(
+  bslib[card_body, card_header],
+  data.table[copy, data.table, rbindlist, uniqueN],
+  gridlayout[grid_card, grid_container],
+  leaflet[
+    addCircleMarkers,
+    addLayersControl,
+    addProviderTiles,
+    addTiles,
+    clearGroup,
+    fitBounds,
+    labelOptions,
+    layersControlOptions,
+    leaflet,
+    leafletOptions,
+    leafletOutput,
+    leafletProxy,
+    providerTileOptions,
+    providers,
+    renderLeaflet,
+    tileOptions
+  ],
+  shiny[...],
+)
 
 box::use(
-  shiny[...],
-  bslib[card, card_header, card_body],
-  gridlayout[grid_container, grid_card],
-  leaflet[...],
-  data.table[...],
-)
-box::use(
   app/logic/api_client[
-    populate_scan_calls, fetch_metrics_for_scan,
-    fetch_tree_inventory_for_scan, fetch_models_for_scan
+    fetch_metrics_for_scan,
+    fetch_models_for_scan,
+    fetch_tree_inventory_for_scan,
+    populate_scan_calls
   ],
-  app/logic/series[parse_treatment_dates, reshape_models_wide],
   app/logic/constants[LABEL_THRESHOLD, MIN_ZOOM_LABELS],
+  app/logic/series[parse_treatment_dates, reshape_models_wide],
 )
 
 #' @export
@@ -34,8 +53,10 @@ ui <- function(id) {
       area = "IntELiMonDSS",
       card_header("Select Scans"),
       card_body(
-        p(strong("Select up to 10 plots"),
-          "by clicking them on the map."),
+        p(
+          strong("Select up to 10 plots"),
+          "by clicking them on the map."
+        ),
         div(
           class = "plot-counter",
           textOutput(ns("plot_count"), inline = TRUE)
@@ -54,8 +75,8 @@ ui <- function(id) {
         actionButton(ns("btn_get_data"), "\u2913  Get Data", width = "100%"),
         textInput(
           inputId = ns("treatment_dates_text"),
-          label   = "Treatment dates",
-          value   = "",
+          label = "Treatment dates",
+          value = "",
           placeholder = "YYYYMMDD, YYYYMMDD..."
         ),
         actionButton(ns("btn_submit_dates"), "Submit treatments", width = "100%")
@@ -84,7 +105,6 @@ ui <- function(id) {
 #' @export
 server <- function(id, state) {
   moduleServer(id, function(input, output, session) {
-
     plots <- state$plots
 
     # -- Selection counter ---------------------------------------------------
@@ -102,12 +122,14 @@ server <- function(id, state) {
     # freshly clicked plots are never hidden.
     filtered_scan_calls <- reactive({
       df <- copy(state$scan_calls())
-      if (nrow(df) == 0) return(df)
+      if (nrow(df) == 0) {
+        return(df)
+      }
 
       df[, .scan_date := as.Date(as.character(date_code), format = "%Y%m%d")]
       df <- df[is.na(.scan_date) |
-                 (.scan_date >= input$daterange[1] &
-                    .scan_date <= input$daterange[2])]
+        (.scan_date >= input$daterange[1] &
+          .scan_date <= input$daterange[2])]
       df[, .scan_date := NULL]
       df[]
     })
@@ -118,8 +140,10 @@ server <- function(id, state) {
 
       if (length(parsed$bad) > 0) {
         showNotification(
-          paste("Ignoring invalid date(s):",
-                paste(parsed$bad, collapse = ", "), "- use YYYYMMDD."),
+          paste(
+            "Ignoring invalid date(s):",
+            paste(parsed$bad, collapse = ", "), "- use YYYYMMDD."
+          ),
           type = "warning", duration = 6
         )
       }
@@ -128,13 +152,17 @@ server <- function(id, state) {
 
       if (length(parsed$ok) > 0) {
         showNotification(
-          sprintf("Stored %d treatment date(s): %s",
-                  length(parsed$ok), paste(parsed$ok, collapse = ", ")),
+          sprintf(
+            "Stored %d treatment date(s): %s",
+            length(parsed$ok), paste(parsed$ok, collapse = ", ")
+          ),
           type = "message", duration = 5
         )
       } else if (length(parsed$bad) == 0) {
-        showNotification("Treatment dates cleared.", type = "message",
-                         duration = 4)
+        showNotification("Treatment dates cleared.",
+          type = "message",
+          duration = 4
+        )
       }
     }
 
@@ -151,11 +179,17 @@ server <- function(id, state) {
           options = providerTileOptions(maxZoom = 20)
         ) |>
         addTiles(
-          urlTemplate = "https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png?key=cb1_2nr5_1_392ce3984694e7a58625372e",
+          urlTemplate = paste0(
+            "https://basemaps.cartocdn.com/rastertiles/voyager/",
+            "{z}/{x}/{y}.png?key=cb1_2nr5_1_392ce3984694e7a58625372e"
+          ),
           group = "Political map",
           options = tileOptions(maxZoom = 20),
           attribution = paste(
-            '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+            paste0(
+              '&copy; <a href="https://www.openstreetmap.org/copyright">',
+              "OpenStreetMap</a> contributors"
+            ),
             '&copy; <a href="https://carto.com/attributions">CARTO</a>'
           )
         ) |>
@@ -170,9 +204,11 @@ server <- function(id, state) {
     # Plots visible in the current map bounds
     visible_plots <- reactive({
       bounds <- input$map_bounds
-      if (is.null(bounds)) return(plots[0])
+      if (is.null(bounds)) {
+        return(plots[0])
+      }
       plots[
-        Latitude  >= bounds$south & Latitude  <= bounds$north &
+        Latitude >= bounds$south & Latitude <= bounds$north &
           Longitude >= bounds$west & Longitude <= bounds$east
       ]
     })
@@ -188,7 +224,9 @@ server <- function(id, state) {
         clearGroup("plot-labels") |>
         clearGroup("plot-circles")
 
-      if (nrow(vp) == 0) return()
+      if (nrow(vp) == 0) {
+        return()
+      }
 
       if (show_labels) {
         proxy |>
@@ -206,7 +244,7 @@ server <- function(id, state) {
           addCircleMarkers(
             data = vp, lng = ~Longitude, lat = ~Latitude,
             group = "plot-circles",
-            layerId = ~paste(site_name, plot, sep = "||"),
+            layerId = ~ paste(site_name, plot, sep = "||"),
             radius = 8, color = "black", weight = 1,
             fillColor = "red", fillOpacity = 0.85, opacity = 1
           )
@@ -215,7 +253,7 @@ server <- function(id, state) {
           addCircleMarkers(
             data = vp, lng = ~Longitude, lat = ~Latitude,
             group = "plot-circles",
-            layerId = ~paste(site_name, plot, sep = "||"),
+            layerId = ~ paste(site_name, plot, sep = "||"),
             radius = 8, color = "black", weight = 1,
             fillColor = "red", fillOpacity = 0.85, opacity = 1
           )
@@ -225,19 +263,26 @@ server <- function(id, state) {
     # Handle circle clicks: append unique rows to scan_calls (max 10 plots)
     observeEvent(input$map_marker_click, {
       click <- input$map_marker_click
-      if (is.null(click$id)) return()
+      if (is.null(click$id)) {
+        return()
+      }
 
       parts <- strsplit(click$id, "\\|\\|")[[1]]
-      if (length(parts) != 2) return()
+      if (length(parts) != 2) {
+        return()
+      }
 
       sc <- state$scan_calls()
 
       already_exists <- nrow(sc[site_name == parts[1] & plot == parts[2]]) > 0
-      if (already_exists) return()
+      if (already_exists) {
+        return()
+      }
 
       if (uniqueN(sc, by = c("site_name", "plot")) >= 10) {
         showNotification("Plot limit reached (10). Clear plots to select others.",
-                         type = "warning", duration = 4)
+          type = "warning", duration = 4
+        )
         return()
       }
 
@@ -275,11 +320,12 @@ server <- function(id, state) {
       sc <- state$scan_calls()
       if (nrow(sc) == 0) {
         showNotification("No plots selected - click plots on the map first.",
-                         type = "warning", duration = 4)
+          type = "warning", duration = 4
+        )
         return()
       }
 
-      clicked <- unique(sc[, .(site_name, plot)])
+      clicked <- unique(sc[, list(site_name, plot)])
 
       withProgress(message = "Querying IntELiMon scans...", value = 0, {
         incProgress(0.1, detail = sprintf("Querying %d plot(s)", nrow(clicked)))
@@ -288,7 +334,8 @@ server <- function(id, state) {
 
         if (nrow(populated) == 0) {
           showNotification("No scans found for the selected plots.",
-                           type = "warning", duration = 6)
+            type = "warning", duration = 6
+          )
           return()
         }
 
@@ -297,9 +344,11 @@ server <- function(id, state) {
         n_missing <- nrow(clicked) -
           uniqueN(populated, by = c("site_name", "plot"))
 
-        msg <- sprintf("Found %d scan(s) across %d plot(s).",
-                       nrow(populated),
-                       uniqueN(populated, by = c("site_name", "plot")))
+        msg <- sprintf(
+          "Found %d scan(s) across %d plot(s).",
+          nrow(populated),
+          uniqueN(populated, by = c("site_name", "plot"))
+        )
         if (n_missing > 0) {
           msg <- paste(msg, sprintf("%d plot(s) had no scans.", n_missing))
         }
@@ -311,7 +360,7 @@ server <- function(id, state) {
     # calls and populate the shared metrics / tree_inventory / models tables.
     observeEvent(input$btn_get_data, {
       df <- filtered_scan_calls()
-      df <- df[nzchar(date_code)]   # only Get-Scans-populated rows are queryable
+      df <- df[nzchar(date_code)] # only Get-Scans-populated rows are queryable
 
       if (nrow(df) == 0) {
         showNotification(
@@ -323,39 +372,51 @@ server <- function(id, state) {
 
       withProgress(message = "Retrieving scan data...", value = 0, {
         metrics_list <- vector("list", nrow(df))
-        trees_list   <- vector("list", nrow(df))
-        models_list  <- vector("list", nrow(df))
-        step <- 1 / nrow(df)
+        trees_list <- vector("list", nrow(df))
+        models_list <- vector("list", nrow(df))
+        step <- 1/nrow(df)
 
         for (i in seq_len(nrow(df))) {
           incProgress(step, detail = df$scan_name[i])
 
           metrics_list[[i]] <- tryCatch(
-            fetch_metrics_for_scan(df$site_name[i], df$plot[i],
-                                   df$date_code[i], df$scanner_id[i]),
+            fetch_metrics_for_scan(
+              df$site_name[i], df$plot[i],
+              df$date_code[i], df$scanner_id[i]
+            ),
             error = function(e) {
               warning("Metrics query failed for ", df$scan_name[i], ": ",
-                      conditionMessage(e), call. = FALSE)
+                conditionMessage(e),
+                call. = FALSE
+              )
               NULL
             }
           )
 
           trees_list[[i]] <- tryCatch(
-            fetch_tree_inventory_for_scan(df$site_name[i], df$plot[i],
-                                          df$date_code[i], df$scanner_id[i]),
+            fetch_tree_inventory_for_scan(
+              df$site_name[i], df$plot[i],
+              df$date_code[i], df$scanner_id[i]
+            ),
             error = function(e) {
               warning("Tree inventory query failed for ", df$scan_name[i], ": ",
-                      conditionMessage(e), call. = FALSE)
+                conditionMessage(e),
+                call. = FALSE
+              )
               NULL
             }
           )
 
           models_list[[i]] <- tryCatch(
-            fetch_models_for_scan(df$site_name[i], df$plot[i],
-                                  df$date_code[i], df$scanner_id[i]),
+            fetch_models_for_scan(
+              df$site_name[i], df$plot[i],
+              df$date_code[i], df$scanner_id[i]
+            ),
             error = function(e) {
               warning("Models query failed for ", df$scan_name[i], ": ",
-                      conditionMessage(e), call. = FALSE)
+                conditionMessage(e),
+                call. = FALSE
+              )
               NULL
             }
           )
@@ -365,11 +426,14 @@ server <- function(id, state) {
         }
 
         metrics <- rbindlist(Filter(Negate(is.null), metrics_list),
-                             use.names = TRUE, fill = TRUE)
+          use.names = TRUE, fill = TRUE
+        )
         tree_inventory <- rbindlist(Filter(Negate(is.null), trees_list),
-                                    use.names = TRUE, fill = TRUE)
+          use.names = TRUE, fill = TRUE
+        )
         additional_models <- rbindlist(Filter(Negate(is.null), models_list),
-                                       use.names = TRUE, fill = TRUE)
+          use.names = TRUE, fill = TRUE
+        )
 
         state$metrics(metrics)
         state$tree_inventory(tree_inventory)
@@ -378,10 +442,14 @@ server <- function(id, state) {
 
         n_ok <- function(x) sum(!vapply(x, is.null, logical(1)))
         showNotification(
-          sprintf(paste("Of %d scan(s) in range: metrics for %d,",
-                        "tree inventories for %d, model sets for %d."),
-                  nrow(df), n_ok(metrics_list), n_ok(trees_list),
-                  n_ok(models_list)),
+          sprintf(
+            paste(
+              "Of %d scan(s) in range: metrics for %d,",
+              "tree inventories for %d, model sets for %d."
+            ),
+            nrow(df), n_ok(metrics_list), n_ok(trees_list),
+            n_ok(models_list)
+          ),
           type = if (n_ok(metrics_list) > 0) "message" else "warning",
           duration = 8
         )

@@ -23,17 +23,55 @@
 # prefix. jsonlite also exports validate(); the explicit namespace guarantees
 # Shiny's version is used regardless of attach order.
 # ---------------------------------------------------------------------------
+box::use(
+  data.table[fwrite, setnames],
+  ggplot2[
+    aes,
+    element_line,
+    element_rect,
+    element_text,
+    expansion,
+    geom_boxplot,
+    geom_col,
+    geom_errorbar,
+    geom_hline,
+    geom_line,
+    geom_point,
+    geom_vline,
+    ggplot,
+    ggsave,
+    labs,
+    margin,
+    position_jitter,
+    scale_x_date,
+    scale_y_continuous,
+    theme,
+    theme_minimal
+  ],
+  grid[unit],
+  shiny[
+    conditionalPanel,
+    div,
+    downloadHandler,
+    downloadLink,
+    outputOptions,
+    plotOutput,
+    radioButtons,
+    renderUI,
+    tags,
+    uiOutput
+  ],
+  stats[approx],
+)
 
 box::use(
-  shiny[div, tags, plotOutput, downloadLink, downloadHandler, outputOptions,
-        radioButtons, conditionalPanel, uiOutput, renderUI],
-  ggplot2[...],
-  stats[approx],
-  grid[unit],
-  data.table[fwrite, setnames],
-  app/logic/series[assign_time_steps, aggregate_time_steps,
-                   percent_change_series, describe_time_steps],
   app/logic/constants[DERIVED_METRICS],
+  app/logic/series[
+    aggregate_time_steps,
+    assign_time_steps,
+    describe_time_steps,
+    percent_change_series
+  ],
 )
 
 # Two palettes for the same plots. SCREEN is the Aurora Glass palette (kept in
@@ -76,7 +114,7 @@ EXPORT_PAL <- list(
 
 TREAT_LW <- 1.4
 POINT_SZ <- 3.4
-DIAMOND  <- 23
+DIAMOND <- 23
 
 # Transparent, light-on-dark theme so ggplot output blends into the glass card.
 # Pair with renderPlot(..., bg = "transparent") in the view modules.
@@ -95,11 +133,16 @@ PLOT_FONT <- "sans"
 #' @export
 axis_fmt <- function(x) {
   fin <- x[is.finite(x)]
-  if (length(fin) == 0) return(format(x))
+  if (length(fin) == 0) {
+    return(format(x))
+  }
   rng <- diff(range(fin))
   step <- if (length(fin) > 1) min(diff(sort(unique(fin)))) else rng
-  digits <- if (!is.finite(step) || step <= 0) 0 else
+  digits <- if (!is.finite(step) || step <= 0) {
+    0
+  } else {
     max(0, min(2, ceiling(-log10(step))))
+  }
   out <- formatC(x, format = "f", digits = digits, big.mark = ",")
   trimws(out)
 }
@@ -107,58 +150,72 @@ axis_fmt <- function(x) {
 #' Continuous y scale used by every card: few breaks, tidy labels.
 #' @export
 y_scale <- function() {
-  scale_y_continuous(n.breaks = 5, labels = axis_fmt,
-                     expand = expansion(mult = 0.08))
+  scale_y_continuous(
+    n.breaks = 5, labels = axis_fmt,
+    expand = expansion(mult = 0.08)
+  )
 }
 
 aurora_theme <- function(pal = SCREEN_PAL) {
   theme_minimal(base_size = 13, base_family = PLOT_FONT) +
     theme(
-      plot.background   = element_rect(fill = pal$bg, color = NA),
-      panel.background  = element_rect(fill = pal$bg, color = NA),
+      plot.background = element_rect(fill = pal$bg, color = NA),
+      panel.background = element_rect(fill = pal$bg, color = NA),
       legend.background = element_rect(fill = pal$bg, color = NA),
-      legend.key        = element_rect(fill = pal$bg, color = NA),
-      panel.grid.major  = element_line(color = pal$grid_major, linewidth = 0.4),
-      panel.grid.minor  = element_line(color = pal$grid_minor, linewidth = 0.3),
-      text              = element_text(color = pal$txt, family = PLOT_FONT,
-                                       face = "plain"),
-      axis.text         = element_text(color = pal$axis_text, size = 10.5,
-                                       face = "plain", lineheight = 0.9),
-      axis.text.y       = element_text(margin = margin(r = 4), hjust = 1),
-      axis.text.x       = element_text(margin = margin(t = 3)),
-      axis.title        = element_text(color = pal$axis_title, size = 11.5),
-      axis.title.y      = element_text(margin = margin(r = 6), angle = 90),
-      axis.title.x      = element_text(margin = margin(t = 5)),
-      plot.title        = element_text(color = pal$title, face = "bold",
-                                       size = 13.5, hjust = 0.5,
-                                       margin = margin(b = 7)),
-      plot.margin       = margin(t = 6, r = 10, b = 4, l = 4),
-      legend.text       = element_text(color = pal$axis_text, size = 9.5),
-      legend.title      = element_text(color = pal$axis_title, size = 10)
+      legend.key = element_rect(fill = pal$bg, color = NA),
+      panel.grid.major = element_line(color = pal$grid_major, linewidth = 0.4),
+      panel.grid.minor = element_line(color = pal$grid_minor, linewidth = 0.3),
+      text = element_text(
+        color = pal$txt, family = PLOT_FONT,
+        face = "plain"
+      ),
+      axis.text = element_text(
+        color = pal$axis_text, size = 10.5,
+        face = "plain", lineheight = 0.9
+      ),
+      axis.text.y = element_text(margin = margin(r = 4), hjust = 1),
+      axis.text.x = element_text(margin = margin(t = 3)),
+      axis.title = element_text(color = pal$axis_title, size = 11.5),
+      axis.title.y = element_text(margin = margin(r = 6), angle = 90),
+      axis.title.x = element_text(margin = margin(t = 5)),
+      plot.title = element_text(
+        color = pal$title, face = "bold",
+        size = 13.5, hjust = 0.5,
+        margin = margin(b = 7)
+      ),
+      plot.margin = margin(t = 6, r = 10, b = 4, l = 4),
+      legend.text = element_text(color = pal$axis_text, size = 9.5),
+      legend.title = element_text(color = pal$axis_title, size = 10)
     )
 }
 
 .treat_vec <- function(treat_dates) {
-  if (length(treat_dates) == 0) return(as.Date(character()))
+  if (length(treat_dates) == 0) {
+    return(as.Date(character()))
+  }
   tv <- as.Date(treat_dates, format = "%Y%m%d")
   tv[!is.na(tv)]
 }
 
 # Add a chronological time-step factor (labelled by the step's mean date).
 .add_step_factor <- function(long) {
-  long[, gdate := mean(scan_date), by = grp]
+  long[, gdate := mean(scan_date), by = grp] # nolint: unused_declared_object_linter.
   labs_chr <- format(long$gdate, "%Y-%m-%d")
   long[, grp_lab := factor(labs_chr,
-                           levels = unique(labs_chr[order(long$gdate)]))]
+    levels = unique(labs_chr[order(long$gdate)])
+  )]
   long
 }
 
 # Interpolate treatment dates onto a discrete (factor) time axis.
 .treat_positions <- function(dates_sorted, tvec) {
-  if (length(tvec) == 0 || length(dates_sorted) == 0) return(numeric())
-  idx  <- seq_along(dates_sorted)
+  if (length(tvec) == 0 || length(dates_sorted) == 0) {
+    return(numeric())
+  }
+  idx <- seq_along(dates_sorted)
   xpos <- approx(as.numeric(dates_sorted), idx,
-                 xout = as.numeric(tvec), rule = 1)$y
+    xout = as.numeric(tvec), rule = 1
+  )$y
   xpos[!is.na(xpos)]
 }
 
@@ -168,7 +225,9 @@ aurora_theme <- function(pal = SCREEN_PAL) {
 # time series can be recomputed from these rows, but not the reverse. The
 # value column is named for the metric so the file says what it holds.
 .export_table <- function(long, y_label) {
-  if (nrow(long) == 0) return(long)
+  if (nrow(long) == 0) {
+    return(long)
+  }
   out <- long[, list(site_name, plot, scan_date, time_step = grp, value)]
   setnames(out, "value", y_label)
   out[]
@@ -190,24 +249,30 @@ aurora_theme <- function(pal = SCREEN_PAL) {
 
   if (metric %in% names(DERIVED_METRICS)) {
     source_col <- DERIVED_METRICS[[metric]]$source
-    transform  <- DERIVED_METRICS[[metric]]$transform
+    transform <- DERIVED_METRICS[[metric]]$transform
   } else {
     source_col <- metric
-    transform  <- identity
+    transform <- identity
   }
 
   shiny::validate(
-    shiny::need(nrow(data_dt) > 0,
-                "No data loaded - press Get Data on the Selection Map tab."),
-    shiny::need(source_col %in% names(data_dt),
-                paste0("Metric '", source_col, "' not found in the data table."))
+    shiny::need(
+      nrow(data_dt) > 0,
+      "No data loaded - press Get Data on the Selection Map tab."
+    ),
+    shiny::need(
+      source_col %in% names(data_dt),
+      paste0("Metric '", source_col, "' not found in the data table.")
+    )
   )
 
   raw <- assign_time_steps(data_dt, source_col, treat_dates, transform)
   if (pct) raw <- percent_change_series(raw)
 
-  list(raw = raw, y_label = y_label, pct = pct,
-       axis_label = if (pct) "% change from first scan" else y_label)
+  list(
+    raw = raw, y_label = y_label, pct = pct,
+    axis_label = if (pct) "% change from first scan" else y_label
+  )
 }
 
 #' Build a metric plot for one metric column of `data_dt`.
@@ -227,14 +292,13 @@ metric_series_plot <- function(metric, y_label, data_dt, treat_dates,
                                errorbars_on, treatlines_on,
                                mode = "timeseries", data_type = "raw",
                                light = FALSE) {
-
   pal <- if (isTRUE(light)) EXPORT_PAL else SCREEN_PAL
   prep <- .series_prep(metric, y_label, data_dt, treat_dates, data_type)
-  raw        <- prep$raw
-  y_label    <- prep$y_label
+  raw <- prep$raw
+  y_label <- prep$y_label
   axis_label <- prep$axis_label
-  pct        <- prep$pct
-  export_dt  <- .export_table(raw, y_label)
+  pct <- prep$pct
+  export_dt <- .export_table(raw, y_label)
 
   tvec <- .treat_vec(treat_dates)
   show_treat <- treatlines_on == "on" && length(tvec) > 0
@@ -243,62 +307,79 @@ metric_series_plot <- function(metric, y_label, data_dt, treat_dates,
   plt <- if (mode == "individual") {
     long <- raw
     shiny::validate(shiny::need(
-      nrow(long) > 0, "No valid values for this metric in the loaded scans."))
+      nrow(long) > 0, "No valid values for this metric in the loaded scans."
+    ))
 
     dr <- as.numeric(diff(range(long$scan_date)))
-    jw <- max(1, dr / 120)
+    jw <- max(1, dr/120)
 
-    p <- ggplot(long, aes(x = scan_date, y = value,
-                          color = label, group = label))
+    p <- ggplot(long, aes(
+      x = scan_date, y = value,
+      color = label, group = label
+    ))
     if (show_treat) {
-      p <- p + geom_vline(xintercept = tvec, color = pal$treat,
-                          linetype = "solid", linewidth = TREAT_LW)
+      p <- p + geom_vline(
+        xintercept = tvec, color = pal$treat,
+        linetype = "solid", linewidth = TREAT_LW
+      )
     }
     p +
       geom_line(linewidth = 0.7, na.rm = TRUE) +
-      geom_point(shape = DIAMOND, size = POINT_SZ, stroke = 0.5,
-                 color = pal$stroke, aes(fill = label),
-                 position = position_jitter(width = jw, height = 0, seed = 42),
-                 na.rm = TRUE) +
+      geom_point(
+        shape = DIAMOND, size = POINT_SZ, stroke = 0.5,
+        color = pal$stroke, aes(fill = label),
+        position = position_jitter(width = jw, height = 0, seed = 42),
+        na.rm = TRUE
+      ) +
       scale_x_date(expand = expansion(mult = 0.05)) +
       y_scale() +
-      labs(x = "Scan date", y = axis_label, title = y_label,
-           color = "Site / Plot", fill = "Site / Plot") +
+      labs(
+        x = "Scan date", y = axis_label, title = y_label,
+        color = "Site / Plot", fill = "Site / Plot"
+      ) +
       aurora_theme(pal) +
       theme(legend.position = "right", legend.key.size = unit(0.9, "lines"))
 
-  # ---- Box & whisker per time step (time on X) --------------------------
+    # ---- Box & whisker per time step (time on X) --------------------------
   } else if (mode == "boxplot") {
     long <- raw
     shiny::validate(shiny::need(
-      nrow(long) > 0, "No valid values for this metric in the loaded scans."))
+      nrow(long) > 0, "No valid values for this metric in the loaded scans."
+    ))
     .add_step_factor(long)
 
     p <- ggplot(long, aes(x = grp_lab, y = value))
     if (show_treat) {
       xpos <- .treat_positions(sort(unique(long$gdate)), tvec)
       if (length(xpos) > 0) {
-        p <- p + geom_vline(xintercept = xpos, color = pal$treat,
-                            linetype = "solid", linewidth = TREAT_LW)
+        p <- p + geom_vline(
+          xintercept = xpos, color = pal$treat,
+          linetype = "solid", linewidth = TREAT_LW
+        )
       }
     }
     p +
-      geom_boxplot(fill = pal$boxfill, color = pal$txt_dim, width = 0.6,
-                   outlier.shape = NA, na.rm = TRUE) +
-      geom_point(shape = DIAMOND, size = POINT_SZ - 0.9, stroke = 0.4,
-                 color = pal$stroke, fill = pal$point,
-                 position = position_jitter(width = 0.12, height = 0, seed = 42),
-                 na.rm = TRUE) +
+      geom_boxplot(
+        fill = pal$boxfill, color = pal$txt_dim, width = 0.6,
+        outlier.shape = NA, na.rm = TRUE
+      ) +
+      geom_point(
+        shape = DIAMOND, size = POINT_SZ - 0.9, stroke = 0.4,
+        color = pal$stroke, fill = pal$point,
+        position = position_jitter(width = 0.12, height = 0, seed = 42),
+        na.rm = TRUE
+      ) +
       y_scale() +
       labs(x = "Scan date (time step)", y = axis_label, title = y_label) +
       aurora_theme(pal) +
       theme(axis.text.x = element_text(angle = 35, hjust = 1))
 
-  # ---- Bar: mean per time step (time on X) ------------------------------
+    # ---- Bar: mean per time step (time on X) ------------------------------
   } else if (mode == "bar") {
     smry <- aggregate_time_steps(raw)
     shiny::validate(shiny::need(
-      nrow(smry) > 0, "No valid values for this metric in the loaded scans."))
+      nrow(smry) > 0, "No valid values for this metric in the loaded scans."
+    ))
     labs_chr <- format(smry$t, "%Y-%m-%d")
     smry[, lab := factor(labs_chr, levels = unique(labs_chr[order(smry$t)]))]
 
@@ -306,14 +387,17 @@ metric_series_plot <- function(metric, y_label, data_dt, treat_dates,
     if (show_treat) {
       xpos <- .treat_positions(sort(smry$t), tvec)
       if (length(xpos) > 0) {
-        p <- p + geom_vline(xintercept = xpos, color = pal$treat,
-                            linetype = "solid", linewidth = TREAT_LW)
+        p <- p + geom_vline(
+          xintercept = xpos, color = pal$treat,
+          linetype = "solid", linewidth = TREAT_LW
+        )
       }
     }
     p <- p + geom_col(fill = pal$accent, width = 0.7, alpha = 0.85)
     if (errorbars_on == "on") {
       p <- p + geom_errorbar(aes(ymin = mean - sd, ymax = mean + sd),
-                             width = 0.3, color = pal$txt_dim, na.rm = TRUE)
+        width = 0.3, color = pal$txt_dim, na.rm = TRUE
+      )
     }
     p +
       y_scale() +
@@ -321,25 +405,31 @@ metric_series_plot <- function(metric, y_label, data_dt, treat_dates,
       aurora_theme(pal) +
       theme(axis.text.x = element_text(angle = 35, hjust = 1))
 
-  # ---- Time series (default) --------------------------------------------
+    # ---- Time series (default) --------------------------------------------
   } else {
     smry <- aggregate_time_steps(raw)
     shiny::validate(shiny::need(
-      nrow(smry) > 0, "No valid values for this metric in the loaded scans."))
+      nrow(smry) > 0, "No valid values for this metric in the loaded scans."
+    ))
 
     p <- ggplot(smry, aes(x = t, y = mean))
     if (show_treat) {
-      p <- p + geom_vline(xintercept = tvec, color = pal$treat,
-                          linetype = "solid", linewidth = TREAT_LW)
+      p <- p + geom_vline(
+        xintercept = tvec, color = pal$treat,
+        linetype = "solid", linewidth = TREAT_LW
+      )
     }
     p <- p + geom_line(color = pal$accent, linewidth = 0.9)
     if (errorbars_on == "on") {
       p <- p + geom_errorbar(aes(ymin = mean - sd, ymax = mean + sd),
-                             width = 5, color = pal$txt_dim, na.rm = TRUE)
+        width = 5, color = pal$txt_dim, na.rm = TRUE
+      )
     }
     p +
-      geom_point(shape = DIAMOND, size = POINT_SZ, stroke = 0.6,
-                 color = pal$stroke, fill = pal$point, na.rm = TRUE) +
+      geom_point(
+        shape = DIAMOND, size = POINT_SZ, stroke = 0.6,
+        color = pal$stroke, fill = pal$point, na.rm = TRUE
+      ) +
       scale_x_date(limits = range(smry$t), expand = expansion(mult = 0.05)) +
       y_scale() +
       labs(x = "Scan date", y = axis_label, title = y_label) +
@@ -348,8 +438,10 @@ metric_series_plot <- function(metric, y_label, data_dt, treat_dates,
 
   # Percent-change cards get a zero rule: the baseline every series starts at.
   if (pct) {
-    plt <- plt + geom_hline(yintercept = 0, color = pal$txt_dim,
-                            linetype = "dashed", linewidth = 0.4)
+    plt <- plt + geom_hline(
+      yintercept = 0, color = pal$txt_dim,
+      linetype = "dashed", linewidth = 0.4
+    )
   }
 
   attr(plt, "imn_raw") <- export_dt
@@ -361,13 +453,16 @@ metric_series_plot <- function(metric, y_label, data_dt, treat_dates,
 # column of the table lines up on the same precision.
 .stat_digits <- function(x) {
   m <- suppressWarnings(max(abs(x[is.finite(x)])))
-  if (!is.finite(m) || m == 0) return(2L)
+  if (!is.finite(m) || m == 0) {
+    return(2L)
+  }
   as.integer(max(0, min(3, 3 - floor(log10(m)))))
 }
 
 .fmt_stat <- function(x, digits) {
   ifelse(is.na(x), "—",
-         formatC(x, format = "f", digits = digits, big.mark = ","))
+    formatC(x, format = "f", digits = digits, big.mark = ",")
+  )
 }
 
 #' Per-time-step descriptive statistics for one metric card, formatted for the
@@ -384,18 +479,19 @@ metric_series_stats <- function(metric, y_label, data_dt, treat_dates,
 
   smry <- describe_time_steps(prep$raw)
   shiny::validate(shiny::need(
-    nrow(smry) > 0, "No valid values for this metric in the loaded scans."))
+    nrow(smry) > 0, "No valid values for this metric in the loaded scans."
+  ))
 
   d <- .stat_digits(unlist(smry[, list(min, max, mean, median, mode, sd)]))
   out <- data.frame(
     `Time step` = format(smry$date, "%Y-%m-%d"),
-    n           = as.character(smry$n),
-    Min         = .fmt_stat(smry$min, d),
-    Max         = .fmt_stat(smry$max, d),
-    Mean        = .fmt_stat(smry$mean, d),
-    Median      = .fmt_stat(smry$median, d),
-    Mode        = .fmt_stat(smry$mode, d),
-    SD          = .fmt_stat(smry$sd, d),
+    n = as.character(smry$n),
+    Min = .fmt_stat(smry$min, d),
+    Max = .fmt_stat(smry$max, d),
+    Mean = .fmt_stat(smry$mean, d),
+    Median = .fmt_stat(smry$median, d),
+    Mode = .fmt_stat(smry$mode, d),
+    SD = .fmt_stat(smry$sd, d),
     check.names = FALSE, stringsAsFactors = FALSE
   )
   attr(out, "imn_label") <- prep$y_label
@@ -418,9 +514,11 @@ plot_card_ui <- function(ns, id, height = "100%") {
     # there is always a way back to the plot).
     div(
       class = "imn-card-view",
-      radioButtons(ns(view), label = NULL, inline = TRUE,
-                   choices = list("Graph" = "graph", "Statistics" = "stats"),
-                   selected = "graph")
+      radioButtons(ns(view),
+        label = NULL, inline = TRUE,
+        choices = list("Graph" = "graph", "Statistics" = "stats"),
+        selected = "graph"
+      )
     ),
     conditionalPanel(
       condition = sprintf("input['%s'] != 'stats'", ns(view)),
@@ -442,11 +540,14 @@ plot_card_ui <- function(ns, id, height = "100%") {
       tags$ul(
         class = "dropdown-menu dropdown-menu-end",
         tags$li(downloadLink(ns(paste0(id, "_dl_csv")), "CSV data",
-                             class = "dropdown-item")),
+          class = "dropdown-item"
+        )),
         tags$li(downloadLink(ns(paste0(id, "_dl_svg")), "SVG image",
-                             class = "dropdown-item")),
+          class = "dropdown-item"
+        )),
         tags$li(downloadLink(ns(paste0(id, "_dl_png")), "PNG image",
-                             class = "dropdown-item"))
+          class = "dropdown-item"
+        ))
       )
     )
   )
@@ -457,7 +558,7 @@ plot_card_ui <- function(ns, id, height = "100%") {
 #' @export
 register_plot_stats <- function(output, id, stats_fn) {
   output[[paste0(id, "_stats")]] <- renderUI({
-    df  <- stats_fn()
+    df <- stats_fn()
     lab <- attr(df, "imn_label")
 
     tags$div(
@@ -497,16 +598,20 @@ register_plot_download <- function(output, id, plot_fn, filename_prefix) {
   )
   output[[paste0(id, "_dl_svg")]] <- downloadHandler(
     filename = function() paste0(filename_prefix, "_", Sys.Date(), ".svg"),
-    content  = function(file) {
-      ggsave(file, plot = plot_fn(light = TRUE), device = "svg",
-             width = 9, height = 5.5, bg = "white")
+    content = function(file) {
+      ggsave(file,
+        plot = plot_fn(light = TRUE), device = "svg",
+        width = 9, height = 5.5, bg = "white"
+      )
     }
   )
   output[[paste0(id, "_dl_png")]] <- downloadHandler(
     filename = function() paste0(filename_prefix, "_", Sys.Date(), ".png"),
-    content  = function(file) {
-      ggsave(file, plot = plot_fn(light = TRUE), device = "png",
-             width = 9, height = 5.5, dpi = 200, bg = "white")
+    content = function(file) {
+      ggsave(file,
+        plot = plot_fn(light = TRUE), device = "png",
+        width = 9, height = 5.5, dpi = 200, bg = "white"
+      )
     }
   )
 

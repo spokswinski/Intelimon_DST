@@ -1,0 +1,42 @@
+linters:
+  linters_with_defaults(
+    defaults = box.linters::rhino_default_linters,
+    line_length_linter = line_length_linter(100),
+    # UPPER_SNAKE_CASE is this project's convention for module-level constants
+    # (TREE_METRIC_LABELS, PANO_CROP_TOP, BROWN_CLASSES, ...).
+    object_name_linter = object_name_linter(
+      styles = c("snake_case", "SNAKE_CASE", "symbols")
+    ),
+    # `rhino::format_r()` styles with `rhino_style`, which sets
+    # `math_token_spacing(zero = "'/'")`. That drops the spaces around `/` and,
+    # because it replaces styler's default `zero = "'^'"`, adds them around
+    # `^`. Excluding both operators here keeps Rhino's formatter and linter
+    # from undoing each other's work on every run.
+    infix_spaces_linter = infix_spaces_linter(
+      exclude_operators = c("/", "^")
+    ),
+    # Every module opens with a `# app/view/foo.R` path header, and that parses
+    # as valid R (`app / view / foo.R` - a chain of divisions on symbols with
+    # dots in them), so this linter flags all 19 of them. Its only genuine hit
+    # in the codebase is the deliberate points2pano placeholder in
+    # app/view/selection_map.R, which is documented and meant to stay.
+    commented_code_linter = NULL
+  )
+exclusions:
+  list(
+    # Base64-encoded logo/sponsor images. One asset per line by construction.
+    "app/logic/brand.R" = list(line_length_linter = Inf),
+    # Anderson 13 / Scott & Burgan 40 standard fuel model tables. One model per
+    # line keeps the parameter columns readable against the published tables.
+    "app/logic/fuel_models.R" = list(line_length_linter = Inf),
+    # Rothermel (1972) / Andrews (2018) surface spread implemented in native US
+    # customary units. Variable names deliberately mirror the published
+    # equation symbols (I_R, Aij, Qig, rbeQ, phi_w, etaS) so each term can be
+    # checked against the source; renaming them to snake_case would break that.
+    "app/logic/fire_behavior.R" = list(object_name_linter = Inf),
+    # `format_r()` orders `leaflet` before `leaflet.extras`; this linter sorts
+    # with method = "radix" (C locale), where "." (0x2E) < "[" (0x5B) and so
+    # wants the reverse. Sorting it by hand does not stick - the next
+    # `format_r()` run swaps it straight back.
+    "app/view/fuel_tool.R" = list(box_alphabetical_calls_linter = Inf)
+  )

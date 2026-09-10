@@ -7,19 +7,21 @@
 # metrics + additional_models_wide, so treatment-driven changes in fuel and
 # canopy structure show up as trends over time.
 # ---------------------------------------------------------------------------
+box::use(
+  bslib[card_body, card_header],
+  gridlayout[grid_card, grid_container],
+  shiny[...],
+)
 
 box::use(
-  shiny[...],
-  bslib[card, card_header, card_body],
-  gridlayout[grid_container, grid_card],
-  data.table[...],
-)
-box::use(
-  app/logic/plotting[metric_series_plot, metric_series_stats, plot_card_ui,
-                     register_plot_download, register_plot_stats],
-  app/logic/fire_behavior[scan_fire_behavior, FIRE_METRIC_LABELS],
-  app/logic/constants[
-    PANO_CROP_TOP, PANO_CROP_BOTTOM, PANO_CROP_LEFT, PANO_CROP_RIGHT
+  app/logic/constants[PANO_CROP_BOTTOM, PANO_CROP_LEFT, PANO_CROP_RIGHT, PANO_CROP_TOP],
+  app/logic/fire_behavior[FIRE_METRIC_LABELS, scan_fire_behavior],
+  app/logic/plotting[
+    metric_series_plot,
+    metric_series_stats,
+    plot_card_ui,
+    register_plot_download,
+    register_plot_stats
   ],
 )
 
@@ -57,71 +59,86 @@ ui <- function(id) {
       card_body(
         style = "overflow-y: auto;",
         radioButtons(ns("fuel_src"), "Surface fuel source",
-                     choices = list("Scan level fuels" = "scan",
-                                    "Fuel tool values" = "tool"),
-                     selected = "scan", width = "100%"),
+          choices = list(
+            "Scan level fuels" = "scan",
+            "Fuel tool values" = "tool"
+          ),
+          selected = "scan", width = "100%"
+        ),
         uiOutput(ns("fuel_src_note")),
         tags$hr(style = "margin:6px 0;"),
-
         selectInput(ns("plot_mode"), "Plot type",
-                    choices = list(
-                      "Time series"                 = "timeseries",
-                      "Time series individual plot"  = "individual",
-                      "Box and Whisker"             = "boxplot",
-                      "Bar"                          = "bar"),
-                    selected = "timeseries", width = "100%"),
+          choices = list(
+            "Time series" = "timeseries",
+            "Time series individual plot" = "individual",
+            "Box and Whisker" = "boxplot",
+            "Bar" = "bar"
+          ),
+          selected = "timeseries", width = "100%"
+        ),
         selectInput(ns("data_type"), "Data type",
-                    choices = list(
-                      "Raw data"       = "raw",
-                      "Percent change" = "percent"),
-                    selected = "raw", width = "100%"),
+          choices = list(
+            "Raw data"       = "raw",
+            "Percent change" = "percent"
+          ),
+          selected = "raw", width = "100%"
+        ),
         radioButtons(ns("show_treatments"), "Treatment date lines",
-                     choices = list("On" = "on", "Off" = "off"),
-                     selected = "on", inline = TRUE, width = "100%"),
+          choices = list("On" = "on", "Off" = "off"),
+          selected = "on", inline = TRUE, width = "100%"
+        ),
         radioButtons(ns("show_errorbars"), "Error bars",
-                     choices = list("On" = "on", "Off" = "off"),
-                     selected = "off", inline = TRUE, width = "100%"),
+          choices = list("On" = "on", "Off" = "off"),
+          selected = "off", inline = TRUE, width = "100%"
+        ),
         tags$hr(style = "margin:6px 0;"),
-
         selectInput(ns("metric_1"), "Card 1 metric",
-                    choices = metric_choices, selected = "ros_ch_hr"),
+          choices = metric_choices, selected = "ros_ch_hr"
+        ),
         selectInput(ns("metric_2"), "Card 2 metric",
-                    choices = metric_choices, selected = "fli_kw_m"),
+          choices = metric_choices, selected = "fli_kw_m"
+        ),
         selectInput(ns("metric_3"), "Card 3 metric",
-                    choices = metric_choices, selected = "torching_idx"),
+          choices = metric_choices, selected = "torching_idx"
+        ),
         tags$hr(style = "margin:6px 0;"),
-
         tags$strong("Wind & slope"),
         numericInput(ns("wind_mph"), "20-ft wind speed (mi/h)",
-                     value = 10, min = 0, max = 100, step = 1),
+          value = 10, min = 0, max = 100, step = 1
+        ),
         numericInput(ns("waf"), "Wind adjustment factor (midflame)",
-                     value = 0.3, min = 0.05, max = 1, step = 0.05),
+          value = 0.3, min = 0.05, max = 1, step = 0.05
+        ),
         numericInput(ns("slope_pct"), "Slope (%)",
-                     value = 0, min = 0, max = 200, step = 5),
+          value = 0, min = 0, max = 200, step = 5
+        ),
         tags$hr(style = "margin:6px 0;"),
-
         tags$strong("Dead fuel moisture (%)"),
         numericInput(ns("m1"), "1-hour", value = 6, min = 1, max = 60, step = 1),
         numericInput(ns("m10"), "10-hour", value = 7, min = 1, max = 60, step = 1),
         numericInput(ns("m100"), "100-hour", value = 8, min = 1, max = 60, step = 1),
         numericInput(ns("mx_dead"), "Dead moisture of extinction",
-                     value = 25, min = 10, max = 60, step = 1),
+          value = 25, min = 10, max = 60, step = 1
+        ),
         tags$hr(style = "margin:6px 0;"),
-
         tags$strong("Live fuel"),
         numericInput(ns("m_herb"), "Herbaceous moisture (%)",
-                     value = 90, min = 30, max = 300, step = 10),
+          value = 90, min = 30, max = 300, step = 10
+        ),
         numericInput(ns("m_woody"), "Woody moisture (%)",
-                     value = 90, min = 30, max = 300, step = 10),
+          value = 90, min = 30, max = 300, step = 10
+        ),
         numericInput(ns("live_herb_load"), "Herbaceous load (tons/acre)",
-                     value = 0, min = 0, max = 10, step = 0.1),
+          value = 0, min = 0, max = 10, step = 0.1
+        ),
         numericInput(ns("live_woody_load"), "Woody load (tons/acre)",
-                     value = 0, min = 0, max = 10, step = 0.1),
+          value = 0, min = 0, max = 10, step = 0.1
+        ),
         tags$hr(style = "margin:6px 0;"),
-
         tags$strong("Canopy"),
         numericInput(ns("fmc"), "Foliar moisture content (%)",
-                     value = 100, min = 60, max = 200, step = 10),
+          value = 100, min = 60, max = 200, step = 10
+        ),
         helpText(
           style = "font-size:11px;",
           "Surface: Rothermel (1972) + Byram. Crown: Van Wagner (1977) with ",
@@ -142,12 +159,18 @@ ui <- function(id) {
           row_sizes = c("1fr", "1fr"),
           col_sizes = c("1fr", "1fr"),
           gap_size = "10px",
-          grid_card(area = "card1", full_screen = TRUE,
-                    card_body(plot_card_ui(ns, "card1"))),
-          grid_card(area = "card2", full_screen = TRUE,
-                    card_body(plot_card_ui(ns, "card2"))),
-          grid_card(area = "card3", full_screen = TRUE,
-                    card_body(plot_card_ui(ns, "card3"))),
+          grid_card(
+            area = "card1", full_screen = TRUE,
+            card_body(plot_card_ui(ns, "card1"))
+          ),
+          grid_card(
+            area = "card2", full_screen = TRUE,
+            card_body(plot_card_ui(ns, "card2"))
+          ),
+          grid_card(
+            area = "card3", full_screen = TRUE,
+            card_body(plot_card_ui(ns, "card3"))
+          ),
           grid_card(
             area = "panoViewer",
             full_screen = TRUE,
@@ -157,8 +180,10 @@ ui <- function(id) {
               div(
                 class = "d-flex align-items-center gap-2",
                 actionButton(ns("btn_pano_prev"), "\u25C0", class = "btn-sm"),
-                div(class = "pano-info",
-                    textOutput(ns("pano_label"), inline = TRUE)),
+                div(
+                  class = "pano-info",
+                  textOutput(ns("pano_label"), inline = TRUE)
+                ),
                 actionButton(ns("btn_pano_next"), "\u25B6", class = "btn-sm")
               )
             ),
@@ -176,11 +201,13 @@ ui <- function(id) {
 #' @export
 server <- function(id, state) {
   moduleServer(id, function(input, output, session) {
-
     # -- Fire behavior table (recomputes when data or any input changes) -----
     env <- reactive({
-      bed <- if (identical(input$fuel_src, "tool"))
-        state$fuel_tool_values() else NULL
+      bed <- if (identical(input$fuel_src, "tool")) {
+        state$fuel_tool_values()
+      } else {
+        NULL
+      }
       list(
         bed             = bed,
         wind_mph        = input$wind_mph,
@@ -206,8 +233,10 @@ server <- function(id, state) {
       if (identical(input$fuel_src, "tool")) {
         shiny::validate(shiny::need(
           !is.null(state$fuel_tool_values()),
-          paste("No fuel values submitted yet - set them on the Fuel tool tab",
-                "and press Submit fuel values, or switch back to scan level fuels.")
+          paste(
+            "No fuel values submitted yet - set them on the Fuel tool tab",
+            "and press Submit fuel values, or switch back to scan level fuels."
+          )
         ))
       }
       scan_fire_behavior(state$metrics(), state$additional_models_wide(), env())
@@ -216,19 +245,29 @@ server <- function(id, state) {
     output$fuel_src_note <- renderUI({
       b <- state$fuel_tool_values()
       if (identical(input$fuel_src, "scan")) {
-        return(div(class = "imn-fnote",
-                   paste("Surface fuels come from each scan's Brown time-lag",
-                         "loads and fuel bed depth.")))
+        return(div(
+          class = "imn-fnote",
+          paste(
+            "Surface fuels come from each scan's Brown time-lag",
+            "loads and fuel bed depth."
+          )
+        ))
       }
       if (is.null(b)) {
-        return(div(class = "imn-sim-warn", tags$b("Nothing submitted. "),
-                   "Set values on the Fuel tool tab and press Submit fuel values."))
+        return(div(
+          class = "imn-sim-warn", tags$b("Nothing submitted. "),
+          "Set values on the Fuel tool tab and press Submit fuel values."
+        ))
       }
-      div(class = "imn-okbox",
-          tags$b(b$label), tags$br(),
-          sprintf("%s \u00B7 %s", b$system, b$aggregation), tags$br(),
-          tags$span(style = "color:var(--imn-dim)",
-                    "Surface fuels held constant across scans; canopy still per-scan."))
+      div(
+        class = "imn-okbox",
+        tags$b(b$label), tags$br(),
+        sprintf("%s \u00B7 %s", b$system, b$aggregation), tags$br(),
+        tags$span(
+          style = "color:var(--imn-dim)",
+          "Surface fuels held constant across scans; canopy still per-scan."
+        )
+      )
     })
 
     # One card renderer bound to a metric-dropdown input id. `light` switches
@@ -237,14 +276,18 @@ server <- function(id, state) {
       plot_fn <- function(light = FALSE) {
         key <- input[[input_id]]
         metric_series_plot(key, FIRE_METRIC_LABELS[[key]], fire_behavior(),
-                           state$treatment_dates(),
-                           input$show_errorbars, input$show_treatments,
-                           input$plot_mode, input$data_type, light = light)
+          state$treatment_dates(),
+          input$show_errorbars, input$show_treatments,
+          input$plot_mode, input$data_type,
+          light = light
+        )
       }
       stats_fn <- function() {
         key <- input[[input_id]]
-        metric_series_stats(key, FIRE_METRIC_LABELS[[key]], fire_behavior(),
-                            state$treatment_dates(), input$data_type)
+        metric_series_stats(
+          key, FIRE_METRIC_LABELS[[key]], fire_behavior(),
+          state$treatment_dates(), input$data_type
+        )
       }
       output[[id]] <- renderPlot(plot_fn(), bg = "transparent", res = 110)
       register_plot_download(output, id, plot_fn, id)
@@ -263,24 +306,36 @@ server <- function(id, state) {
       sc[nzchar(date_code)]
     })
 
-    observeEvent(state$scan_calls(), { pano_idx(1) })
+    observeEvent(state$scan_calls(), {
+      pano_idx(1)
+    })
 
     observeEvent(input$btn_pano_prev, {
-      n <- nrow(pano_scans()); if (n == 0) return()
+      n <- nrow(pano_scans())
+      if (n == 0) {
+        return()
+      }
       pano_idx(if (pano_idx() <= 1) n else pano_idx() - 1)
     })
     observeEvent(input$btn_pano_next, {
-      n <- nrow(pano_scans()); if (n == 0) return()
+      n <- nrow(pano_scans())
+      if (n == 0) {
+        return()
+      }
       pano_idx(if (pano_idx() >= n) 1 else pano_idx() + 1)
     })
 
     output$pano_label <- renderText({
       df <- pano_scans()
-      if (nrow(df) == 0) return("No scans loaded")
+      if (nrow(df) == 0) {
+        return("No scans loaded")
+      }
       row <- df[min(pano_idx(), nrow(df))]
       date_fmt <- format(as.Date(row$date_code, format = "%Y%m%d"), "%m-%d-%Y")
-      sprintf("Site: %s | Plot: %s | %s | Scanner: %s",
-              row$site_name, row$plot, date_fmt, row$scanner_id)
+      sprintf(
+        "Site: %s | Plot: %s | %s | Scanner: %s",
+        row$site_name, row$plot, date_fmt, row$scanner_id
+      )
     })
 
     output$pano_frame <- renderUI({

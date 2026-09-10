@@ -10,23 +10,22 @@
 # embedded (base64) assets from app/logic/brand.R. Aurora Glass styling is in
 # app/static/styles.css, attached through the header slot.
 # ---------------------------------------------------------------------------
-
 box::use(
-  shiny[NS, moduleServer, tags, includeCSS, div, span, img,
-        textOutput, renderText, outputOptions],
-  bslib[page_navbar, nav_panel, nav_spacer, nav_item, bs_theme],
+  bslib[bs_theme, nav_item, nav_panel, nav_spacer, page_navbar],
   data.table[uniqueN],
+  shiny[NS, div, img, includeCSS, moduleServer, outputOptions, renderText, span, tags, textOutput],
 )
+
 box::use(
   app/logic/app_state[new_app_state],
   app/logic/brand[logo_uri, sponsors],
-  app/view/selection_map,
   app/view/direct_outputs,
-  app/view/predictive_models,
-  app/view/fuel_tool,
   app/view/forestry_tool,
-  app/view/rothrmel,
+  app/view/fuel_tool,
   app/view/help,
+  app/view/predictive_models,
+  app/view/rothrmel,
+  app/view/selection_map,
 )
 
 # Navbar brand: logo + two-line wordmark. The mark links to the IntELiMon
@@ -64,29 +63,31 @@ sponsor_footer <- function() {
 ui <- function(id) {
   ns <- NS(id)
   page_navbar(
-    title       = brand_title(),
+    title = brand_title(),
     window_title = "IntELiMon Decision Support Tool",
-    selected    = "Selection Map",
+    selected = "Selection Map",
     collapsible = TRUE,
-    theme       = bs_theme(),
+    theme = bs_theme(),
     # Styles are attached here rather than via app/styles/main.scss: page_navbar
     # builds a complete page and Rhino's separate stylesheet link does not
     # reliably merge into it, so the header slot is the dependable place.
-    header      = tags$head(includeCSS("app/static/styles.css")),
-    footer      = sponsor_footer(),
-    nav_panel("Selection Map",     selection_map$ui(ns("selection_map"))),
-    nav_panel("Direct outputs",    direct_outputs$ui(ns("direct_outputs"))),
+    header = tags$head(includeCSS("app/static/styles.css")),
+    footer = sponsor_footer(),
+    nav_panel("Selection Map", selection_map$ui(ns("selection_map"))),
+    nav_panel("Direct outputs", direct_outputs$ui(ns("direct_outputs"))),
     nav_panel("Predictive models", predictive_models$ui(ns("predictive_models"))),
-    nav_panel("Fuel tool",         fuel_tool$ui(ns("fuel_tool"))),
-    nav_panel("Forestry tool",     forestry_tool$ui(ns("forestry_tool"))),
-    nav_panel("rothRmel",          rothrmel$ui(ns("rothrmel"))),
-    nav_panel("Help",              help$ui(ns("help"))),
+    nav_panel("Fuel tool", fuel_tool$ui(ns("fuel_tool"))),
+    nav_panel("Forestry tool", forestry_tool$ui(ns("forestry_tool"))),
+    nav_panel("rothRmel", rothrmel$ui(ns("rothrmel"))),
+    nav_panel("Help", help$ui(ns("help"))),
     # Selection readout, pinned to the right-hand end of the navbar. It reads
     # the shared state, so it stays correct from whichever tab is open.
     nav_spacer(),
     nav_item(
-      div(class = "imn-scancount",
-          textOutput(ns("scan_summary"), inline = TRUE))
+      div(
+        class = "imn-scancount",
+        textOutput(ns("scan_summary"), inline = TRUE)
+      )
     )
   )
 }
@@ -116,12 +117,16 @@ server <- function(id) {
     # scan count is the populated rows and the plot count the distinct combos.
     output$scan_summary <- renderText({
       sc <- state$scan_calls()
-      if (nrow(sc) == 0) return("No plots selected")
+      if (nrow(sc) == 0) {
+        return("No plots selected")
+      }
       n_plots <- uniqueN(sc, by = c("site_name", "plot"))
       n_scans <- sum(nzchar(sc$date_code))
-      sprintf("%d scan%s from %d plot%s selected",
-              n_scans,  if (n_scans  == 1) "" else "s",
-              n_plots,  if (n_plots  == 1) "" else "s")
+      sprintf(
+        "%d scan%s from %d plot%s selected",
+        n_scans, if (n_scans == 1) "" else "s",
+        n_plots, if (n_plots == 1) "" else "s"
+      )
     })
 
     # Below the navbar breakpoint the readout collapses into the hamburger

@@ -48,7 +48,7 @@ MIN_ZOOM_LABELS <- 11
 # its own UI (header, bottom nav bar, side arrows) can't be restyled from
 # this app; instead the iframe is oversized and shifted so those strips are
 # clipped out of view. Set all to 0 for the full page.
-PANO_CROP_TOP    <- 70   # px of the pano page's top header to hide
-PANO_CROP_BOTTOM <- 90   # px of the pano page's bottom nav bar to hide
-PANO_CROP_LEFT   <- 60   # px of the left edge (side arrow) to hide
-PANO_CROP_RIGHT  <- 60   # px of the right edge (side arrow) to hide
+PANO_CROP_TOP <- 70 # px of the pano page's top header to hide
+PANO_CROP_BOTTOM <- 90 # px of the pano page's bottom nav bar to hide
+PANO_CROP_LEFT <- 60 # px of the left edge (side arrow) to hide
+PANO_CROP_RIGHT <- 60 # px of the right edge (side arrow) to hide
