@@ -11,7 +11,7 @@
 # app/static/styles.css, attached through the header slot.
 # ---------------------------------------------------------------------------
 box::use(
-  bslib[bs_theme, nav_item, nav_panel, nav_spacer, page_navbar],
+  bslib[bs_theme, nav_item, nav_panel, nav_spacer, navbar_options, page_navbar],
   data.table[uniqueN],
   shiny[NS, div, img, includeCSS, moduleServer, outputOptions, renderText, span, tags, textOutput],
 )
@@ -66,7 +66,7 @@ ui <- function(id) {
     title = brand_title(),
     window_title = "IntELiMon Decision Support Tool",
     selected = "Selection Map",
-    collapsible = TRUE,
+    navbar_options = navbar_options(collapsible = TRUE),
     theme = bs_theme(),
     # Styles are attached here rather than via app/styles/main.scss: page_navbar
     # builds a complete page and Rhino's separate stylesheet link does not
