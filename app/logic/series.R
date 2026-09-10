@@ -3,17 +3,18 @@
 # Time-series construction and treatment-date parsing. Pure functions on
 # data.tables; no Shiny.
 # ---------------------------------------------------------------------------
-
 box::use(
-  data.table[data.table, as.data.table, copy, dcast, setorder],
-  stats[sd, median],
+  data.table[.N, copy, data.table, dcast, setorder],
+  stats[median, sd],
 )
 
 #' Parse a comma-separated string of YYYYMMDD dates; returns list(ok, bad).
 parse_treatment_dates <- function(txt) {
   parts <- trimws(unlist(strsplit(txt, ",")))
   parts <- parts[nzchar(parts)]
-  if (length(parts) == 0) return(list(ok = character(), bad = character()))
+  if (length(parts) == 0) {
+    return(list(ok = character(), bad = character()))
+  }
 
   valid <- grepl("^\\d{8}$", parts) & !is.na(as.Date(parts, format = "%Y%m%d"))
   list(ok = parts[valid], bad = parts[!valid])
@@ -42,26 +43,28 @@ assign_time_steps <- function(metrics_dt, metric_col, treat_dates,
                               transform = identity) {
   df <- data.table(
     site_name = as.character(metrics_dt$site_name),
-    plot      = as.character(metrics_dt$plot),
+    plot = as.character(metrics_dt$plot),
     scan_date = as.Date(metrics_dt$date_code, format = "%Y%m%d"),
-    value     = transform(
+    value = transform(
       suppressWarnings(as.numeric(metrics_dt[[metric_col]]))
     )
   )
   df[, combo := paste(site_name, plot, sep = "||")]
   df[, label := paste(site_name, plot, sep = " / ")]
   df <- df[!is.na(scan_date) & !is.na(value)]
-  if (nrow(df) == 0) return(df)
+  if (nrow(df) == 0) {
+    return(df)
+  }
   setorder(df, scan_date)
 
   tvec <- sort(as.Date(treat_dates, format = "%Y%m%d"))
   tvec <- tvec[!is.na(tvec)]
 
   # Walk unique dates in order, assigning each date to a time-step group
-  dates    <- sort(unique(df$scan_date))
+  dates <- sort(unique(df$scan_date))
   date_grp <- integer(length(dates))
-  seen     <- character()   # site/plot combos already in the current step
-  g        <- 1L
+  seen <- character() # site/plot combos already in the current step
+  g <- 1L
 
   for (k in seq_along(dates)) {
     combos_today <- unique(df[scan_date == dates[k], combo])
@@ -69,11 +72,11 @@ assign_time_steps <- function(metrics_dt, metric_col, treat_dates,
     if (k > 1) {
       treat_between <- length(tvec) > 0 &&
         any(tvec > dates[k - 1] & tvec <= dates[k])
-      repeat_visit  <- any(combos_today %in% seen)
-      gap_days      <- as.numeric(dates[k] - dates[k - 1])
+      repeat_visit <- any(combos_today %in% seen)
+      gap_days <- as.numeric(dates[k] - dates[k - 1])
 
       if (treat_between || repeat_visit || gap_days > 30) {
-        g    <- g + 1L
+        g <- g + 1L
         seen <- character()
       }
     }
@@ -102,15 +105,19 @@ assign_time_steps <- function(metrics_dt, metric_col, treat_dates,
 #' so it slots in ahead of aggregate_time_steps() or straight into the
 #' per-observation plot modes.
 percent_change_series <- function(long) {
-  if (nrow(long) == 0) return(long)
+  if (nrow(long) == 0) {
+    return(long)
+  }
 
   df <- copy(long)
   setorder(df, combo, scan_date)
   df[, base := value[1L], by = combo]
   df <- df[is.finite(base) & base != 0]
-  if (nrow(df) == 0) return(df)
+  if (nrow(df) == 0) {
+    return(df)
+  }
 
-  df[, value := (value - base) / abs(base) * 100]
+  df[, value := (value - base)/abs(base) * 100]
   df[, base := NULL]
   setorder(df, scan_date)
   df[]
@@ -119,12 +126,14 @@ percent_change_series <- function(long) {
 #' Aggregate assign_time_steps() output to one row per time step:
 #' t (mean date), mean, sd, n. Used by the "time series" and "bar" modes.
 aggregate_time_steps <- function(df) {
-  if (nrow(df) == 0) return(df)
+  if (nrow(df) == 0) {
+    return(df)
+  }
 
-  df[, .(
+  df[, list(
     t    = mean(scan_date),
     mean = mean(value),
-    sd   = sd(value),      # NA when a step holds a single scan
+    sd   = sd(value), # NA when a step holds a single scan
     n    = .N
   ), by = grp][order(t)]
 }
@@ -136,12 +145,16 @@ aggregate_time_steps <- function(df) {
 # that precision - reported as a dash rather than a misleading first value.
 .modal_value <- function(x) {
   v <- x[is.finite(x)]
-  if (length(v) == 0) return(NA_real_)
+  if (length(v) == 0) {
+    return(NA_real_)
+  }
   r <- signif(v, 3)
   u <- unique(r)
   cnt <- tabulate(match(r, u))
-  if (max(cnt) < 2) return(NA_real_)
-  u[which.max(cnt)]          # ties resolve to the first-occurring value
+  if (max(cnt) < 2) {
+    return(NA_real_)
+  }
+  u[which.max(cnt)] # ties resolve to the first-occurring value
 }
 
 #' Descriptive statistics per time step, for the Statistics view on the plot
@@ -154,9 +167,11 @@ aggregate_time_steps <- function(df) {
 #' `date` is the step's mean scan date, matching the x positions the time
 #' series and bar modes plot. `sd` is NA for a step holding a single scan.
 describe_time_steps <- function(long) {
-  if (nrow(long) == 0) return(data.table())
+  if (nrow(long) == 0) {
+    return(data.table())
+  }
 
-  long[, .(
+  long[, list(
     date   = mean(scan_date),
     n      = .N,
     min    = min(value),
@@ -183,7 +198,9 @@ build_metric_series <- function(metrics_dt, metric_col, treat_dates,
 #' stripped to a generic model name (onehrmod) so the same model lines up
 #' across sites.
 reshape_models_wide <- function(models_dt) {
-  if (nrow(models_dt) == 0) return(data.table())
+  if (nrow(models_dt) == 0) {
+    return(data.table())
+  }
 
   dt <- copy(models_dt)
 
@@ -200,6 +217,6 @@ reshape_models_wide <- function(models_dt) {
     dt,
     site_name + plot + date_code + scanner_id ~ model_name,
     value.var = "model_metric_value",
-    fun.aggregate = mean   # collapses accidental duplicates
+    fun.aggregate = mean # collapses accidental duplicates
   )
 }

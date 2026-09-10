@@ -5,10 +5,9 @@
 # exported so callers can build ad-hoc endpoints (e.g. the future
 # points2pano call).
 # ---------------------------------------------------------------------------
-
 box::use(
+  data.table[as.data.table, data.table, rbindlist, setcolorder],
   jsonlite[fromJSON],
-  data.table[data.table, as.data.table, rbindlist, setcolorder],
 )
 
 #' API root
@@ -23,14 +22,15 @@ load_plots <- function() {
 
   plots <- data.frame(
     site_name = raw$site_name,
-    plot      = raw$plot,
-    location  = raw$location,
+    plot = raw$plot,
+    location = raw$location,
     stringsAsFactors = FALSE
   )
 
   plots$location <- gsub("[POINT()]", "", plots$location)
   plots <- tidyr::separate(
-    plots, col = location,
+    plots,
+    col = location,
     into = c("Longitude", "Latitude"), sep = " "
   )
 
@@ -43,7 +43,7 @@ load_plots <- function() {
   coords <- sf::st_coordinates(pts_wgs84)
 
   plots$Longitude <- coords[, 1]
-  plots$Latitude  <- coords[, 2]
+  plots$Latitude <- coords[, 2]
 
   as.data.table(plots)
 }
@@ -53,9 +53,11 @@ load_plots <- function() {
 pick_field <- function(df, candidates) {
   hit <- intersect(candidates, names(df))
   if (length(hit) == 0) {
-    stop("None of [", paste(candidates, collapse = ", "),
-         "] found in /scans response. Fields returned: ",
-         paste(names(df), collapse = ", "))
+    stop(
+      "None of [", paste(candidates, collapse = ", "),
+      "] found in /scans response. Fields returned: ",
+      paste(names(df), collapse = ", ")
+    )
   }
   df[[hit[1]]]
 }
@@ -79,19 +81,30 @@ fetch_scans_for_plot <- function(site, plot) {
       dfs <- Filter(is.data.frame, raw)
       if (length(dfs) > 0) raw <- dfs[[1]]
     }
-    if (!is.data.frame(raw)) return(NULL)   # no scans for this combo
+    if (!is.data.frame(raw)) {
+      return(NULL)
+    } # no scans for this combo
   }
-  if (nrow(raw) == 0) return(NULL)
+  if (nrow(raw) == 0) {
+    return(NULL)
+  }
 
   # Keep only scans marked Available
   if ("status" %in% names(raw)) {
     raw <- raw[raw$status == "Available", , drop = FALSE]
-    if (nrow(raw) == 0) return(NULL)
+    if (nrow(raw) == 0) {
+      return(NULL)
+    }
   }
 
-  date_code  <- as.character(pick_field(raw, c("date", "scan_date", "date_code")))
-  scanner_id <- as.character(pick_field(raw, c("scanner_id", "scannerId",
-                                               "scanner", "scanner_num")))
+  date_code <- as.character(pick_field(raw, c(
+    "date", "scan_date",
+    "date_code"
+  )))
+  scanner_id <- as.character(pick_field(raw, c(
+    "scanner_id", "scannerId",
+    "scanner", "scanner_num"
+  )))
 
   # Normalize dates to YYYYMMDD in case they arrive as YYYY-MM-DD
   date_code <- gsub("-", "", date_code)
@@ -117,14 +130,18 @@ populate_scan_calls <- function(clicked) {
       fetch_scans_for_plot(clicked$site_name[i], clicked$plot[i]),
       error = function(e) {
         warning("Scan query failed for ", clicked$site_name[i], "/",
-                clicked$plot[i], ": ", conditionMessage(e), call. = FALSE)
+          clicked$plot[i], ": ", conditionMessage(e),
+          call. = FALSE
+        )
         NULL
       }
     )
   }
 
   out <- rbindlist(Filter(Negate(is.null), results), use.names = TRUE)
-  if (nrow(out) == 0) return(out)
+  if (nrow(out) == 0) {
+    return(out)
+  }
 
   setcolorder(out, c("site_name", "plot", "date_code", "scan_name", "scanner_id"))
   out[]
@@ -135,9 +152,9 @@ populate_scan_calls <- function(clicked) {
 fetch_metrics_for_scan <- function(site, plot, date_code, scanner_id) {
   url <- paste0(
     base_url, "/scan/metrics",
-    "?site=",       utils::URLencode(site, reserved = TRUE),
-    "&plot=",       utils::URLencode(plot, reserved = TRUE),
-    "&date=",       utils::URLencode(date_code, reserved = TRUE),
+    "?site=", utils::URLencode(site, reserved = TRUE),
+    "&plot=", utils::URLencode(plot, reserved = TRUE),
+    "&date=", utils::URLencode(date_code, reserved = TRUE),
     "&scanner_id=", utils::URLencode(scanner_id, reserved = TRUE)
   )
 
@@ -154,15 +171,21 @@ fetch_metrics_for_scan <- function(site, plot, date_code, scanner_id) {
         raw <- as.data.frame(raw[lengths(raw) == 1], stringsAsFactors = FALSE)
       }
     }
-    if (!is.data.frame(raw) || nrow(raw) == 0) return(NULL)
+    if (!is.data.frame(raw) || nrow(raw) == 0) {
+      return(NULL)
+    }
   }
-  if (nrow(raw) == 0) return(NULL)
+  if (nrow(raw) == 0) {
+    return(NULL)
+  }
 
   out <- as.data.table(raw)
-  out[, `:=`(site_name  = site,
-             plot       = plot,
-             date_code  = date_code,
-             scanner_id = scanner_id)]
+  out[, `:=`( # nolint: box_usage_linter.
+    site_name = site,
+    plot = plot,
+    date_code = date_code,
+    scanner_id = scanner_id
+  )]
   setcolorder(out, c("site_name", "plot", "date_code", "scanner_id"))
   out
 }
@@ -173,16 +196,18 @@ fetch_metrics_for_scan <- function(site, plot, date_code, scanner_id) {
 fetch_tree_inventory_for_scan <- function(site, plot, date_code, scanner_id) {
   url <- paste0(
     base_url, "/scan/tree_inventory",
-    "?site=",       utils::URLencode(site, reserved = TRUE),
-    "&plot=",       utils::URLencode(plot, reserved = TRUE),
-    "&date=",       utils::URLencode(date_code, reserved = TRUE),
+    "?site=", utils::URLencode(site, reserved = TRUE),
+    "&plot=", utils::URLencode(plot, reserved = TRUE),
+    "&date=", utils::URLencode(date_code, reserved = TRUE),
     "&scanner_id=", utils::URLencode(scanner_id, reserved = TRUE),
     "&format=json"
   )
 
   raw <- fromJSON(url, flatten = TRUE)
 
-  if (!is.data.frame(raw) || nrow(raw) == 0) return(NULL)
+  if (!is.data.frame(raw) || nrow(raw) == 0) {
+    return(NULL)
+  }
 
   # Drop the unnamed row-index column the endpoint prepends
   raw <- raw[, nzchar(names(raw)), drop = FALSE]
@@ -191,10 +216,12 @@ fetch_tree_inventory_for_scan <- function(site, plot, date_code, scanner_id) {
   raw <- utils::type.convert(raw, as.is = TRUE)
 
   out <- as.data.table(raw)
-  out[, `:=`(site_name  = site,
-             plot       = plot,
-             date_code  = date_code,
-             scanner_id = scanner_id)]
+  out[, `:=`( # nolint: box_usage_linter.
+    site_name = site,
+    plot = plot,
+    date_code = date_code,
+    scanner_id = scanner_id
+  )]
   setcolorder(out, c("site_name", "plot", "date_code", "scanner_id"))
   out
 }
@@ -206,32 +233,42 @@ fetch_tree_inventory_for_scan <- function(site, plot, date_code, scanner_id) {
 fetch_models_for_scan <- function(site, plot, date_code, scanner_id) {
   url <- paste0(
     base_url, "/scan/additional_models_metrics",
-    "?site=",       utils::URLencode(site, reserved = TRUE),
-    "&plot=",       utils::URLencode(plot, reserved = TRUE),
-    "&date=",       utils::URLencode(date_code, reserved = TRUE),
+    "?site=", utils::URLencode(site, reserved = TRUE),
+    "&plot=", utils::URLencode(plot, reserved = TRUE),
+    "&date=", utils::URLencode(date_code, reserved = TRUE),
     "&scanner_id=", utils::URLencode(scanner_id, reserved = TRUE)
   )
 
   raw <- fromJSON(url)
 
-  if (!is.data.frame(raw) || nrow(raw) == 0) return(NULL)
-  if (!"models" %in% names(raw)) return(NULL)
+  if (!is.data.frame(raw) || nrow(raw) == 0) {
+    return(NULL)
+  }
+  if (!"models" %in% names(raw)) {
+    return(NULL)
+  }
 
   # Unnest: one output row per model, carrying the scan-level fields
   rows <- lapply(seq_len(nrow(raw)), function(i) {
     m <- raw$models[[i]]
-    if (!is.data.frame(m) || nrow(m) == 0) return(NULL)
+    if (!is.data.frame(m) || nrow(m) == 0) {
+      return(NULL)
+    }
     scan_cols <- raw[i, setdiff(names(raw), "models"), drop = FALSE]
     cbind(scan_cols[rep(1, nrow(m)), , drop = FALSE], m)
   })
 
   out <- rbindlist(Filter(Negate(is.null), rows), use.names = TRUE, fill = TRUE)
-  if (nrow(out) == 0) return(NULL)
+  if (nrow(out) == 0) {
+    return(NULL)
+  }
 
-  out[, `:=`(site_name  = site,
-             plot       = plot,
-             date_code  = date_code,
-             scanner_id = scanner_id)]
+  out[, `:=`( # nolint: box_usage_linter.
+    site_name = site,
+    plot = plot,
+    date_code = date_code,
+    scanner_id = scanner_id
+  )]
   setcolorder(out, c("site_name", "plot", "date_code", "scanner_id"))
   out
 }
